@@ -1,54 +1,23 @@
-# Stage 1: Build the C++ application
-FROM gcc:latest AS cpp_builder # Use a suitable C++ compiler image (e.g., Ubuntu with build-essential)
-
+FROM gcc:latest AS cpp_builder
 WORKDIR /usr/src/cpp_app
-
-# Copy C++ source code
 COPY ./cpp_app ./
+RUN npm run buildJobs
 
-# Compile the C++ application
-# Adjust this command based on your C++ build system (e.g., make, cmake, g++)
-# Example for a simple single-file C++ app:
-RUN g++ -o cpp_app_binary main.cpp # This creates an executable named 'cpp_app_binary'
-
-# Stage 2: Build the Node.js worker application
-FROM node:20-alpine AS node_builder
-
+FROM node:18-alpine AS node_builder
 WORKDIR /usr/src/app
-
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
-
-# Copy the worker-specific Node.js code
-COPY ./worker ./worker
-# If worker is part of a larger NestJS project and needs to be built:
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
-RUN yarn build worker # Assuming your package.json has a build script for the worker
+RUN npm run build webServer
 
-# Stage 3: Create the final production-ready worker image
-FROM node:20-alpine
-
+FROM node:18-alpine AS runner
 WORKDIR /usr/src/app
-
-# Copy the built Node.js worker code
-COPY --from=node_builder /usr/src/app/worker ./worker # Adjust path if your build output is different
-# If worker build creates dist/ folder:
-# COPY --from=node_builder /usr/src/app/dist/worker ./worker
-
-# Copy node_modules and package.json for runtime dependencies
+COPY --from=cpp_builder /usr/src/cpp_app/dist/worker/jobs ./dist/worker/jobs
+COPY --from=node_builder /usr/src/app/dist ./dist 
 COPY --from=node_builder /usr/src/app/node_modules ./node_modules
 COPY --from=node_builder /usr/src/app/package.json ./package.json
 
-# Copy the compiled C++ binary from the cpp_builder stage
-# IMPORTANT: This path must match what `child_process.spawn()` uses in your worker.ts
-COPY --from=cpp_builder /usr/src/cpp_app/cpp_app_binary /usr/local/bin/cpp_app_binary
-
-# Set a non-root user for security (optional but recommended)
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 
-# Set environment variables for the worker
-ENV CPP_BINARY_PATH="/usr/local/bin/cpp_app_binary"
-
-# Command to run the Node.js worker application
-CMD ["node", "worker/worker.js"] # Adjust path if your worker main file is different
+CMD ["node", "dist/worker/worker.js"] 
