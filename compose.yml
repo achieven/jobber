@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: my_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: always
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: my_redisinsight
+    ports:
+      - '5540:5540'
+    depends_on:
+      - redis 
+    restart: always
+
+  webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.webServer
+    container_name: my_web_server
+    ports:
+      - '3000:3000'
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 3000
+      NODE_ENV: production
+    depends_on:
+      - redis
+    restart: always
+    deploy: 
+      replicas: 1
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: my_worker
+    environment:
+      REDIS_HOST: redis 
+      REDIS_PORT: 6379
+      WORKER_CONCURRENCY: 2 
+      NODE_ENV: production
+    depends_on:
+      - redis
+    restart: always
+    deploy: 
+      replicas: 1
+
+volumes:
+  redis_data:
+  redisinsight_data:
