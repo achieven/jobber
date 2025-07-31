@@ -1,7 +1,7 @@
 FROM gcc:latest AS cpp_builder
 WORKDIR /usr/src/cpp_app
-COPY ./cpp_app ./
-RUN npm run buildJobs
+COPY ./src/worker/jobs ./src/worker/jobs
+RUN mkdir -p dist/worker/jobs && g++ -static src/worker/jobs/dummy-job.cpp -o dist/worker/jobs/dummy-job
 
 FROM node:18-alpine AS node_builder
 WORKDIR /usr/src/app
@@ -13,7 +13,8 @@ RUN npm run build webServer
 FROM node:18-alpine AS runner
 WORKDIR /usr/src/app
 COPY --from=cpp_builder /usr/src/cpp_app/dist/worker/jobs ./dist/worker/jobs
-COPY --from=node_builder /usr/src/app/dist ./dist 
+COPY --from=node_builder /usr/src/app/dist/worker ./dist//worker
+COPY --from=node_builder /usr/src/app/dist/shared ./dist/shared
 COPY --from=node_builder /usr/src/app/node_modules ./node_modules
 COPY --from=node_builder /usr/src/app/package.json ./package.json
 

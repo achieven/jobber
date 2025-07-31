@@ -1,10 +1,8 @@
 
-// worker/worker.ts
 import { Worker, Job } from 'bullmq';
 import { spawn } from 'child_process';
-import { join } from 'path';
 import { getConnectionOptions } from '../shared/redis/redis.config';
-import { getQueueOptions } from '../web-server/queue/queue.service';
+import { getQueueOptions } from '../shared/queue/queue';
 
 const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '1', 10);
 
@@ -40,10 +38,8 @@ const worker = new Worker(
     },
 );
 
-// Add error handler to ensure retries work
 worker.on('failed', (job, err) => {
     console.log(`Job ${job?.id} failed with error: ${err.message}`);
-    // Don't throw here - let BullMQ handle the retry logic
 });
 
 worker.on('error', (err) => {

@@ -4,11 +4,12 @@ WORKDIR /usr/src/app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build webServer
+RUN npm run buildWebServer
 
 FROM node:18-alpine AS runner
 WORKDIR /usr/src/app
-COPY --from=builder /usr/src/app/dist ./dist 
+COPY --from=builder /usr/src/app/dist/web-server ./dist//web-server
+COPY --from=builder /usr/src/app/dist/shared ./dist/shared
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./package.json
 
@@ -17,4 +18,4 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/web-server/main.js"]

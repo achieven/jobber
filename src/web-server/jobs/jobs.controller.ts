@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { QueueService } from '../queue/queue.service';
-import { JobPayload } from '../queue/queue.service';
+import { JobPayload } from '../../shared/models/job';
 
 @Controller('jobs')
 export class JobsController {

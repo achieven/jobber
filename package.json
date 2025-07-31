@@ -8,8 +8,9 @@
   "scripts": {
     "build": "npm run buildWebServer && npm run buildWorker",
     "buildWebServer": "nest build web-server",
-    "buildWorker": "nest build worker && npm run buildJobs",
-    "buildJobs": "mkdir -p dist/worker/jobs && g++ src/worker/jobs/dummy-job.cpp -o dist/worker/jobs/dummy-job",
+    "buildWorkerAndJobs": "npm run buildWorker && npm run buildJobs",
+    "buildWorker": "nest build worker",
+    "buildJobs": "mkdir -p dist/worker/jobs && g++ -static src/worker/jobs/dummy-job.cpp -o dist/worker/jobs/dummy-job",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
