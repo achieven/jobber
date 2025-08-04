@@ -1,13 +1,13 @@
 
 import { Worker, Job } from 'bullmq';
 import { spawn } from 'child_process';
-import { getConnectionOptions } from '../shared/redis/redis.config';
-import { getQueueOptions } from '../shared/queue/queue';
-
-const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '1', 10);
+import { getQueueOptions, getWorkerOptions } from '../shared/queue/queue';
+import { JOB_STATUS } from '../shared/models/job';
+import { setActiveJob, setCompletedJob, setFailedJob } from './database/jobs';
+import { getConnectionOptions } from 'src/shared/redis/redis.config';
 
 console.log(`Worker starting, connecting to Redis...`);
-console.log(`Worker concurrency set to: ${WORKER_CONCURRENCY}`);
+
 
 const worker = new Worker(
     getQueueOptions().name,
@@ -28,23 +28,34 @@ const worker = new Worker(
             throw error;
         }
     },
-    {
-        connection: getConnectionOptions(), 
-        concurrency: WORKER_CONCURRENCY,
-        limiter: {
-            max: 1000,
-            duration: 1000
-        }
-    },
+    getWorkerOptions(getConnectionOptions()),
 );
 
-worker.on('failed', (job, err) => {
-    console.log(`Job ${job?.id} failed with error: ${err.message}`);
+worker.on('progress', async (job: Job, progress: number | object) => {
+
+});
+
+worker.on('active', async (job) => {
+    return await setActiveJob(job.id, job.name, JOB_STATUS.ACTIVE, {});
+});
+
+worker.on('completed', async (job: Job, returnvalue: any) => {
+    return await setCompletedJob(job.id, job.name, JOB_STATUS.COMPLETED, {
+        result: job.returnvalue,
+    });
 });
 
 worker.on('error', (err) => {
     console.error('Worker error:', err);
 });
+
+worker.on('failed', async (job: Job, err: Error) => {
+    return await setFailedJob(job.id, job.name, JOB_STATUS.FAILED, {
+        error: err.message,
+    });
+});
+
+
 
 async function executeCppJob(jobName: string, jobData: string[], attemptNumber?: number): Promise<string> {
     return new Promise((resolve, reject) => {

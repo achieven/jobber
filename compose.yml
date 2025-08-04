@@ -1,23 +1,43 @@
-version: '3.8'
-
 services:
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack:latest
     container_name: my_redis
     ports:
       - '6379:6379'
+      - '8001:8001'
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     restart: always
-
-  redisinsight:
-    image: redis/redisinsight:latest
-    container_name: my_redisinsight
+  
+  couchbase:
+    build:
+      context: .
+      dockerfile: Dockerfile.couchbase
+    container_name: my_couchbase
     ports:
-      - '5540:5540'
-    depends_on:
-      - redis 
+      - "8091-8097:8091-8097" 
+      - "11210:11210"        
+    environment:
+      - CB_CLUSTER_USERNAME=Administrator
+      - CB_CLUSTER_PASSWORD=password
+      - CB_CLUSTER_RAMSIZE=256
+      - CB_CLUSTER_INDEX_RAMSIZE=256
+      - CB_CLUSTER_FTS_RAMSIZE=256
+      - CB_CLUSTER_QUERY_RAMSIZE=256
+      - CB_CLUSTER_ANALYTICS_RAMSIZE=1024
+      - CB_CLUSTER_EVENTING_RAMSIZE=256
+      - CB_CLUSTER_BUCKET_DEFAULT_RAMSIZE=256
+      - CB_CLUSTER_SERVICES=data,index,query,fts,analytics,eventing
+    volumes:
+      - couchbase-data:/opt/couchbase/var
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8091/pools/default"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - couchbase-net
     restart: always
 
   webserver:
@@ -31,9 +51,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PORT: 3000
+      COUCHBASE_HOST: localhost
+      COUCHBASE_PORT: 11210
+      COUCHBASE_USERNAME: Administrator
+      COUCHBASE_PASSWORD: password
       NODE_ENV: production
     depends_on:
       - redis
+      - couchbase
     restart: always
     deploy: 
       replicas: 1
@@ -46,14 +71,24 @@ services:
     environment:
       REDIS_HOST: redis 
       REDIS_PORT: 6379
-      WORKER_CONCURRENCY: 2 
+      COUCHBASE_HOST: localhost #TODO - not working in docker
+      COUCHBASE_PORT: 11210
+      COUCHBASE_USERNAME: Administrator 
+      COUCHBASE_PASSWORD: password
+      CORES_PER_CPP_PROCESS: 1
       NODE_ENV: production
     depends_on:
       - redis
+      - couchbase
     restart: always
     deploy: 
       replicas: 1
 
+networks:
+  couchbase-net:
+    driver: bridge
+
 volumes:
   redis_data:
-  redisinsight_data:
+  couchbase-data:
+    driver: local

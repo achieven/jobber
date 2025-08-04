@@ -13,5 +13,10 @@ export class QueueService {
         console.log(`Job ${job.id} added to queue with data: ${JSON.stringify(payload)}`);
         return job;
     }
+
+    async getJobs() {
+        const job = await this.myJobQueue.getJobs();
+        return job;
+    }
 }
 

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { QueueService } from '../queue/queue.service';
 import { JobPayload } from '../../shared/models/job';
@@ -10,10 +10,6 @@ export class JobsController {
     @Post('/jobs')
     async postJob(@Body() payload: JobPayload, @Res() res: Response) {
         try {
-            if (!payload.jobName || !payload.arguments) {//TODO add real validation
-                return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Input data is required.' });
-            }
-
             const job = await this.queueService.addJobToQueue(payload);
             return res.status(HttpStatus.ACCEPTED).json({
                 message: 'Job submitted successfully',
@@ -24,6 +20,22 @@ export class JobsController {
             console.error('Error submitting job:', error);
             return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
                 message: 'Failed to submit job',
+                error: error.message,
+            });
+        }
+    }
+
+    @Get('/jobs')
+    async getJobs(@Res() res: Response) {
+        try {
+            const jobs = await this.queueService.getJobs();
+            return res.status(HttpStatus.ACCEPTED).json({
+                jobs
+            });
+        } catch (error) {
+            console.error('Error submitting job:', error);
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+                message: 'Failed to get jobs',
                 error: error.message,
             });
         }

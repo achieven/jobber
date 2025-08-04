@@ -12,6 +12,7 @@ docker
 
 ```bash
 $ docker compose up
+wait 60 seconds for couchbase to come up
 ```
 
 ## TODO achi:

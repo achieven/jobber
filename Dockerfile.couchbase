@@ -1,0 +1,5 @@
+FROM couchbase/server:enterprise-7.6.2
+
+COPY ./couchbase/configure-node.sh /opt/couchbase
+RUN chmod +x /opt/couchbase/configure-node.sh
+CMD ["/opt/couchbase/configure-node.sh"]
