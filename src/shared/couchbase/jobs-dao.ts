@@ -16,6 +16,7 @@ export class JobsDAO extends BaseDAO {
             MutateInSpec.upsert('jobId', jobId, { createPath: true }), //TODO - could replace existing jobId & jobName, only CAS or niql update can save us
             MutateInSpec.upsert('jobName', jobName, { createPath: true }),  
             MutateInSpec.upsert('status', status, { createPath: true }),
+            MutateInSpec.upsert('updatedAt', updatedAt, { createPath: true }),
             MutateInSpec.arrayAppend('events',
                 Object.assign({}, data, { 
                     status,
@@ -36,16 +37,20 @@ export class JobsDAO extends BaseDAO {
     }
 
     async getJobs() {
-        /*
-        SELECT
-    jobName,
-    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS activeCount,
-    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failedCount,
-    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completedCount,
-    ARRAY_AGG(jobId) AS allJobIds,
-    ARRAY_AGG(CASE WHEN events.status = 'active' THEN jobId END) AS activeJobIds
-FROM default._default.jobs
-GROUP BY jobName
-        */
+        const fields = `jobName,
+            MAX([updatedAt, TO_NUMBER(jobId), status, events]) as latestInvocation,
+            SUM(CASE WHEN status = ${JOB_STATUS.ACTIVE} THEN 1 ELSE 0 END) AS activeCount,
+            SUM(CASE WHEN status = ${JOB_STATUS.FAILED} THEN 1 ELSE 0 END) AS failedCount,
+            SUM(CASE WHEN status = ${JOB_STATUS.COMPLETED} THEN 1 ELSE 0 END) AS completedCount,
+            ARRAY_AGG(jobId) AS allJobIds,
+            ARRAY_AGG(CASE WHEN status = ${JOB_STATUS.ACTIVE} THEN ARRAY event for event in events when event.status = ${JOB_STATUS.ACTIVE} END END) AS activeJobs
+            `
+        return await this.select(
+            {
+                fields,
+                groupBy: 'jobName', 
+                orderBy: 'MAX(updatedAt)'
+            }
+        );
     }
 }

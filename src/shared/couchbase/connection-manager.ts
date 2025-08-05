@@ -65,6 +65,12 @@ class CouchbaseConnectionManager {
             console.log('Couchbase connection initialized successfully');
         } catch (error) {
             console.error('Failed to initialize Couchbase connection:', error);
+            console.error('Connection details:', {
+                host: this.config.host,
+                port: this.config.port,
+                username: this.config.username,
+                timeout: this.config.timeout
+            });
             throw error;
         }
     }
@@ -125,5 +131,4 @@ class CouchbaseConnectionManager {
     }
 }
 
-// Export singleton instance
 export const couchbaseManager = CouchbaseConnectionManager.getInstance(); 

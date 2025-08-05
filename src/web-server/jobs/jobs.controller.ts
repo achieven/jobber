@@ -2,6 +2,9 @@ import { Controller, Get, Post, Body, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { QueueService } from '../queue/queue.service';
 import { JobPayload } from '../../shared/models/job';
+import { JobsDAO } from '../../shared/couchbase/jobs-dao';
+
+const jobsDAO = new JobsDAO();
 
 @Controller('jobs')
 export class JobsController {
@@ -28,7 +31,7 @@ export class JobsController {
     @Get('/jobs')
     async getJobs(@Res() res: Response) {
         try {
-            const jobs = await this.queueService.getJobs();
+            const jobs = await jobsDAO.getJobs();
             return res.status(HttpStatus.ACCEPTED).json({
                 jobs
             });

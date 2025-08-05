@@ -68,9 +68,30 @@ export abstract class BaseDAO {
         return this._scope;
     }
 
+    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string }): Promise<any> {
+        let { fields, where, groupBy, orderBy, limit, offset } = options;
+        fields = fields || '*';
+        where = where || '';
+        groupBy = groupBy || '';
+        orderBy = orderBy || '';
+        limit = (limit || (where || groupBy ? '' : 100));
+        offset = offset || '';
+
+        const bucket = await this.bucket;
+        const query = `SELECT ${fields} 
+            FROM ${this.bucketName}.${this.scopeName}.${this.collectionName} 
+            ${where   ? `WHERE ${where}`      : where} 
+            ${groupBy ? `GROUP BY ${groupBy}` : groupBy} 
+            ${orderBy ? `ORDER BY ${orderBy}` : orderBy} 
+            ${limit   ? `LIMIT    ${limit}`   : limit} 
+            ${offset  ? `LIMIT    ${offset}`  : offset} 
+            `
+        console.log(query);
+        return (await bucket.cluster.query(query)).rows;
+    }
 
     protected async mutateIn(key: string, specs: any[], options?: any): Promise<any> {
-        const collection = await this.getCollectionInternal();
+        const collection = await this.collection;
         return collection.mutateIn(key, specs, options);
     }
 
