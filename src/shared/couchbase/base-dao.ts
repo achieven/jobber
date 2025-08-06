@@ -1,5 +1,6 @@
-import { Collection, Bucket, Scope, CollectionQueryIndexManager } from 'couchbase';
+import { Collection, Bucket, Scope, CollectionQueryIndexManager, IndexExistsError } from 'couchbase';
 import { couchbaseManager } from './connection-manager';
+import { JOB_STATUS } from '../models/job';
 
 export abstract class BaseDAO {
     protected DEFAULT_LIMIT: number = 100;
@@ -112,28 +113,46 @@ export abstract class BaseDAO {
     protected async ensureIndexes(collectionName: string): Promise<void> {
         const collection = await this.collection;
         const indexManager = new CollectionQueryIndexManager(collection);
-        await indexManager.createPrimaryIndex({
+        const indexCreationOptions = {
             ignoreIfExists: true,
             deferred: true
-        });
+        }
+
         await indexManager.createIndex('jobs_summary', 
             ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
-           {
-            ignoreIfExists: true,
-            deferred: true
-           } 
+            indexCreationOptions
         );
 
         await indexManager.createIndex('jobs_per_attempts', 
             ['attempts',  'status'],
-           {
-            ignoreIfExists: true,
-            deferred: true
-           } 
+            indexCreationOptions
         );
-        /*
-        explain CREATE INDEX idx_job_summary ON `default`.`_default`.`jobs`(jobName, updatedAt DESC, status, ALL ARRAY e.status FOR e IN events END)
-        */
+
+        await createArrayIndexes();
+
         await indexManager.buildDeferredIndexes();
     }
 } 
+
+//sdk doesn't seem to handle array indexes and treats it like a field index, with backticks surrounding
+//also, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it
+async function createArrayIndexes() {
+    try {
+        await (await this.bucket).cluster.query(
+            `CREATE INDEX job_start_time ON ${this.bucketName}.${this.scopeName}.${this.collectionName} (DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events)) WITH {"defer_build": true}`
+        );
+    } catch (error) {
+        if (!(error instanceof IndexExistsError)) {
+            throw error;
+        }
+        await waitTillIndexCreation();
+    }
+}
+
+async function waitTillIndexCreation() {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            resolve(true);
+        }, 10000);
+    })
+}
