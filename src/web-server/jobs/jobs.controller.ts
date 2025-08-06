@@ -10,7 +10,7 @@ const jobsDAO = new JobsDAO();
 export class JobsController {
     constructor(private readonly queueService: QueueService) {}
     
-    @Post('/jobs')
+    @Post('/')
     async postJob(@Body() payload: JobPayload, @Res() res: Response) {
         try {
             const job = await this.queueService.addJobToQueue(payload);
@@ -28,7 +28,7 @@ export class JobsController {
         }
     }
 
-    @Get('/jobs')
+    @Get('/')
     async getJobs(@Res() res: Response) {
         try {
             const jobs = await jobsDAO.getJobs();

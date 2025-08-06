@@ -46,9 +46,9 @@ services:
     ports:
       - '3000:3000'
     environment:
+      PORT: 3000
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      PORT: 3000
       COUCHBASE_HOST: couchbase
       COUCHBASE_PORT: 11210
       COUCHBASE_USERNAME: Administrator

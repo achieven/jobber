@@ -36,11 +36,11 @@ worker.on('progress', async (job: Job, progress: number | object) => {
 });
 
 worker.on('active', async (job) => {
-    return await setActiveJob(job.id, job.name, JOB_STATUS.ACTIVE, {});
+    return await setActiveJob(job.id, job.name, job.data, JOB_STATUS.ACTIVE, {});
 });
 
-worker.on('completed', async (job: Job, returnvalue: any) => {
-    return await setCompletedJob(job.id, job.name, JOB_STATUS.COMPLETED, {
+worker.on('completed', async (job: Job) => {
+    return await setCompletedJob(job.id, job.name, job.data, JOB_STATUS.COMPLETED, {
         result: job.returnvalue,
     });
 });
@@ -50,7 +50,7 @@ worker.on('error', (err) => {
 });
 
 worker.on('failed', async (job: Job, err: Error) => {
-    return await setFailedJob(job.id, job.name, JOB_STATUS.FAILED, {
+    return await setFailedJob(job.id, job.name, job.data, JOB_STATUS.FAILED, {
         error: err.message,
     });
 });

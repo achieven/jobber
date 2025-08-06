@@ -2,6 +2,9 @@ import { Collection, Bucket, Scope, CollectionQueryIndexManager } from 'couchbas
 import { couchbaseManager } from './connection-manager';
 
 export abstract class BaseDAO {
+    protected DEFAULT_LIMIT: number = 100;
+    protected NO_LIMIT: string = 'no limit';
+
     private static isInitialized = false;
 
     protected bucketName: string;
@@ -68,18 +71,29 @@ export abstract class BaseDAO {
         return this._scope;
     }
 
-    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string }): Promise<any> {
-        let { fields, where, groupBy, orderBy, limit, offset } = options;
+    protected async selectRaw(query: string): Promise<any> {
+        const bucket = await this.bucket;
+        console.log(query);
+        return (await bucket.cluster.query(query)).rows;
+    }
+
+    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string, from? : string }): Promise<any> {
+        let { fields, where, groupBy, orderBy, limit, offset, from } = options;
         fields = fields || '*';
         where = where || '';
         groupBy = groupBy || '';
         orderBy = orderBy || '';
-        limit = (limit || (where || groupBy ? '' : 100));
+        limit = (
+            limit && limit !== this.NO_LIMIT ? limit :
+            (where || groupBy || this.NO_LIMIT === limit) ? '' :
+            this.DEFAULT_LIMIT
+        );
         offset = offset || '';
+        from = from || `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
 
         const bucket = await this.bucket;
         const query = `SELECT ${fields} 
-            FROM ${this.bucketName}.${this.scopeName}.${this.collectionName} 
+            FROM ${from} 
             ${where   ? `WHERE ${where}`      : where} 
             ${groupBy ? `GROUP BY ${groupBy}` : groupBy} 
             ${orderBy ? `ORDER BY ${orderBy}` : orderBy} 
@@ -102,6 +116,24 @@ export abstract class BaseDAO {
             ignoreIfExists: true,
             deferred: true
         });
+        await indexManager.createIndex('jobs_summary', 
+            ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
+           {
+            ignoreIfExists: true,
+            deferred: true
+           } 
+        );
+
+        await indexManager.createIndex('jobs_per_attempts', 
+            ['attempts',  'status'],
+           {
+            ignoreIfExists: true,
+            deferred: true
+           } 
+        );
+        /*
+        explain CREATE INDEX idx_job_summary ON `default`.`_default`.`jobs`(jobName, updatedAt DESC, status, ALL ARRAY e.status FOR e IN events END)
+        */
         await indexManager.buildDeferredIndexes();
     }
 } 
