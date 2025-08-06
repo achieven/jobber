@@ -3,7 +3,7 @@ import { Worker, Job } from 'bullmq';
 import { spawn } from 'child_process';
 import { getQueueOptions, getWorkerOptions } from '../shared/queue/queue';
 import { JOB_STATUS } from '../shared/models/job';
-import { setActiveJob, setCompletedJob, setFailedJob } from './database/jobs';
+import { setActiveJob, setCompletedJob, setFailedJob } from './services/jobs.service';
 import { getConnectionOptions } from 'src/shared/redis/redis.config';
 
 console.log(`Worker starting, connecting to Redis...`);

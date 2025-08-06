@@ -8,6 +8,7 @@ export class JobsDAO extends BaseDAO {
     constructor() {
         super('default', '_default', 'jobs');
     }
+
     
     async upsertJobEvent(jobId: string, jobName: string, jobData: any[], status: JOB_STATUS, data: any): Promise<MutateInResult> {
         console.log(jobId, jobName, status, data);
@@ -48,6 +49,7 @@ export class JobsDAO extends BaseDAO {
             return await this.mutateIn(id, mutateInSpecs, {
                 upsertDocument: true
             });
+
         } catch (error) {
             console.error('Error in upsertJobEvent:', error);//TODO add to errors bucket/collection (preferably collection)
             // throw error;
@@ -73,7 +75,43 @@ export class JobsDAO extends BaseDAO {
         );
     }
 
-    async getStats() {
+    async getErrorCategorySuccessRate(errorCategories: any[]) {
+
+        //what is the success rate of jobs that failed with errors
+        let errorCategoriesPromises = [];
+        for (let errorCategory of errorCategories) {
+            const errorCategoriesQuery = `
+                WITH MostSimilar AS(
+            SELECT
+                 meta(t).id as text,
+                 SEARCH_SCORE() as score
+            FROM
+                default._default.errorVectors AS t
+            WHERE
+                SEARCH(t.${'`'}value${'`'}, {
+                        "knn": [{
+                            "field": "value",
+                            "k": 3,
+                            "vector": [${errorCategory}]
+}]
+
+                })
+        )
+        
+    select j.jobId, array e.error for e in j.events when e.status='failed' end, MostSimilar.score, MostSimilar.text from MostSimilar
+    join default._default.jobs j
+    on array e.error for e in j.events when e.status='failed' end
+    where MostSimilar.score > 0.3
+    order by MostSimilar.score desc
+            `
+            errorCategoriesPromises.push(this.selectRaw(errorCategoriesQuery));
+        }
+
+        const errorCategoriesResults = await Promise.all(errorCategoriesPromises);
+        return errorCategoriesResults;
+    }
+
+    async getStats(errorCategories: any[]) {
         const bucketScopeCollection = `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
         const successRateAs = 'successRatePercentage';
         const sumCompletedJobsAs = 'completedJobs';
@@ -123,7 +161,8 @@ export class JobsDAO extends BaseDAO {
                 t1.attempts
         `
         
-
+        //possibly with postgres it might have been able to leverage the timeseries feature to do the window matching.
+        //either way, couchbase's time-series function doesn't help us here, except possibly for indexing, but not at the level of querying essentially different
         const perConcurrentJobsQuery = `
             WITH JobTimeWindows AS (
                 -- Step 1: Calculate the active time window for each job.
@@ -183,7 +222,8 @@ export class JobsDAO extends BaseDAO {
 
         let promises = [
             this.selectRaw(perAttemptsStatsQuery),
-            this.selectRaw(perConcurrentJobsQuery)
+            this.selectRaw(perConcurrentJobsQuery),
+            this.getErrorCategorySuccessRate(errorCategories)
         ];
 
 
@@ -197,3 +237,4 @@ export class JobsDAO extends BaseDAO {
         return await Promise.all(promises);
     }
 }
+

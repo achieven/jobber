@@ -21,6 +21,8 @@ couchbase-cli bucket-create \
   --bucket-ramsize $CB_CLUSTER_BUCKET_DEFAULT_RAMSIZE
 
 couchbase-cli collection-manage -c localhost:8091 -u $CB_CLUSTER_USERNAME -p $CB_CLUSTER_PASSWORD  --bucket default --create-collection _default.jobs
+couchbase-cli collection-manage -c localhost:8091 -u $CB_CLUSTER_USERNAME -p $CB_CLUSTER_PASSWORD  --bucket default --create-collection _default.errorVectors
+couchbase-cli collection-manage -c localhost:8091 -u $CB_CLUSTER_USERNAME -p $CB_CLUSTER_PASSWORD  --bucket default --create-collection _default.errorCategories
 
 COUCHBASE_PID=$!
 wait $COUCHBASE_PID

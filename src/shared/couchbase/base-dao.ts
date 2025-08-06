@@ -21,7 +21,7 @@ export abstract class BaseDAO {
         this.collectionName = collectionName;
     }
 
-    private async ensureInitialized(): Promise<void> {
+    protected async ensureInitialized(): Promise<void> {
         console.log(BaseDAO.isInitialized)
         if (!BaseDAO.isInitialized) {
             try {
@@ -105,6 +105,16 @@ export abstract class BaseDAO {
         return (await bucket.cluster.query(query)).rows;
     }
 
+    protected async upsert(key: string, value: any) {
+        const collection = await this.collection;
+        return collection.upsert(key, value);
+    }
+
+    protected async insert(key: string, value: any) {
+        const collection = await this.collection;
+        return collection.insert(key, value);
+    }
+
     protected async mutateIn(key: string, specs: any[], options?: any): Promise<any> {
         const collection = await this.collection;
         return collection.mutateIn(key, specs, options);
@@ -128,26 +138,28 @@ export abstract class BaseDAO {
             indexCreationOptions
         );
 
-        await createArrayIndexes();
+        await this.createArrayIndexes();
 
         await indexManager.buildDeferredIndexes();
+    }
+
+    async createArrayIndexes() {
+        try {
+            await (await this.bucket).cluster.query(
+                `CREATE INDEX job_start_time ON ${this.bucketName}.${this.scopeName}.${this.collectionName} (DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events)) WITH {"defer_build": true}`
+            );
+        } catch (error) {
+            if (!(error instanceof IndexExistsError)) {
+                throw error;
+            }
+            await waitTillIndexCreation();
+        }
     }
 } 
 
 //sdk doesn't seem to handle array indexes and treats it like a field index, with backticks surrounding
 //also, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it
-async function createArrayIndexes() {
-    try {
-        await (await this.bucket).cluster.query(
-            `CREATE INDEX job_start_time ON ${this.bucketName}.${this.scopeName}.${this.collectionName} (DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events)) WITH {"defer_build": true}`
-        );
-    } catch (error) {
-        if (!(error instanceof IndexExistsError)) {
-            throw error;
-        }
-        await waitTillIndexCreation();
-    }
-}
+
 
 async function waitTillIndexCreation() {
     return new Promise((resolve, reject) => {

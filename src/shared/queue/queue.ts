@@ -9,7 +9,7 @@ export function getQueueOptions(): RegisterQueueOptions {
             attempts: 3,
             backoff: {
                 type: 'exponential',
-                delay: 10,
+                delay: 1000,
             },
             removeOnComplete: {
                 age: 3600, 

@@ -18,7 +18,8 @@ export interface CompletedJobDetails extends BaseJobDetails {
 }
 
 export interface FailedJobDetails extends BaseJobDetails {
-    error: any; 
+    error: string;
+    errorVector?: number[];
 }
 
 
