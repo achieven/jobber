@@ -3,7 +3,7 @@ import { JOB_STATUS, ActiveJobDetails, CompletedJobDetails, FailedJobDetails } f
 import { JobsDAO } from '../../shared/couchbase/jobs-dao';
 import { ErrorVectorDAO } from '../../shared/couchbase/error-vector-dao';
 import { OpenAIService } from '../../shared/vectorization/openai.service';
-import { getTextToVector, setTextToVector } from '../database/redis/textToVector';
+import { checkTextCacheHit, setTextCache } from '../database/redis/textToVector';
 
 @Injectable()
 export class JobsService {
@@ -22,10 +22,10 @@ export class JobsService {
     }
 
     async setFailedJob(jobId: string, jobName: string, jobData: any[], jobStatus: JOB_STATUS, jobDetails: FailedJobDetails) {
-        jobDetails.error = 'Null pointer exception';//TODO remove this, it's just for testing
+        jobDetails.error = 'cant read property of undefined';//TODO remove this, it's just for testing
         await this.jobsDAO.upsertJobEvent(jobId, jobName, jobData, jobStatus, jobDetails)
         const errorMessage = jobDetails.error;
-        let vector = await getTextToVector(errorMessage);
+        let vector = await checkTextCacheHit(errorMessage);
         let vectorEmbedding = null;
         if (!vector) {
             vectorEmbedding = await this.openAIService.getEmbedding(errorMessage);
@@ -36,7 +36,7 @@ export class JobsService {
             // redis awaits couchbase, since couchbase is the source of truth, and redis is just a cache, since it's local therefore much faster for cache hits, which are the more common case
             // has we not awaited couchbase, a possible scenario is that redis inserted the vector, and that's it for couchbase - it won't ever be inserted, since couchbase upserts it based on the redis result (hence the more logical pub-sub architecture)
             await this.errorVectorDAO.upsertErrorVector(errorMessage, vectorEmbedding);
-            await setTextToVector(errorMessage, vectorEmbedding)
+            await setTextCache(errorMessage, true)
         }
     }
 }
