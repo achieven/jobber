@@ -1,7 +1,8 @@
+import { Injectable } from '@nestjs/common';
 import { Collection, Bucket, Scope, CollectionQueryIndexManager, IndexExistsError } from 'couchbase';
 import { couchbaseManager } from './connection-manager';
-import { JOB_STATUS } from '../models/job';
 
+@Injectable()
 export abstract class BaseDAO {
     protected DEFAULT_LIMIT: number = 100;
     protected NO_LIMIT: string = 'no limit';
@@ -48,6 +49,10 @@ export abstract class BaseDAO {
         return this.getScopeInternal();
     }
 
+    get bucketScopeCollection(): string {
+        return `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
+    }
+
     private async getCollectionInternal(): Promise<Collection> {
         if (!this._collection) {
             await this.ensureInitialized();
@@ -72,14 +77,8 @@ export abstract class BaseDAO {
         return this._scope;
     }
 
-    protected async selectRaw(query: string): Promise<any> {
-        const bucket = await this.bucket;
-        console.log(query);
-        return (await bucket.cluster.query(query)).rows;
-    }
-
-    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string, from? : string }): Promise<any> {
-        let { fields, where, groupBy, orderBy, limit, offset, from } = options;
+    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string }): Promise<any> {
+        let { fields, where, groupBy, orderBy, limit, offset } = options;
         fields = fields || '*';
         where = where || '';
         groupBy = groupBy || '';
@@ -90,17 +89,22 @@ export abstract class BaseDAO {
             this.DEFAULT_LIMIT
         );
         offset = offset || '';
-        from = from || `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
 
         const bucket = await this.bucket;
         const query = `SELECT ${fields} 
-            FROM ${from} 
+            FROM ${this.bucketScopeCollection} 
             ${where   ? `WHERE ${where}`      : where} 
             ${groupBy ? `GROUP BY ${groupBy}` : groupBy} 
             ${orderBy ? `ORDER BY ${orderBy}` : orderBy} 
             ${limit   ? `LIMIT    ${limit}`   : limit} 
             ${offset  ? `LIMIT    ${offset}`  : offset} 
             `
+        console.log(query);
+        return (await bucket.cluster.query(query)).rows;
+    }
+
+    protected async selectRaw(query: string): Promise<any> {
+        const bucket = await this.bucket;
         console.log(query);
         return (await bucket.cluster.query(query)).rows;
     }

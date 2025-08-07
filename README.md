@@ -7,6 +7,7 @@ A project for launching c++ jobs from a node.js nestjs application, and tracking
 ## Prerequisites
 
 docker
+OPENAI_API_KEY that can use the embeddings capability
 
 ## Deployment
 

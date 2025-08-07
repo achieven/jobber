@@ -1,7 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import { OpenAI } from "openai";
 import { config } from 'dotenv';
 config();
 
+@Injectable()
 export class OpenAIService {
     private openai: OpenAI;
 

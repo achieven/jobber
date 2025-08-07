@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { StatsController } from './stats.controller';
+import { JobsService } from './jobs.service';
 import { CouchbaseModule } from '../../shared/couchbase/couchbase.module';
-import { StatsService } from './stats.service';
 import { OpenAIService } from '../../shared/vectorization/openai.service';
 
 @Module({
     imports: [CouchbaseModule],
-    controllers: [StatsController],
-    providers: [StatsService, OpenAIService]
+    providers: [JobsService, OpenAIService],
+    exports: [JobsService]
 })
-export class StatsModule {}
+export class JobsModule {} 
