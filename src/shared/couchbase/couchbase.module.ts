@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ErrorVectorDAO } from './error-vector-dao';
+import { ErrorVectorMessageDAO } from './error-vector-message-dao';
+import { ErrorCategoriesVectorDAO } from './error-categories-vector-dao';
 import { JobsDAO } from './jobs-dao';
 
-
 @Module({
-    providers: [JobsDAO, ErrorVectorDAO],
-    exports: [JobsDAO, ErrorVectorDAO]
+    providers: [JobsDAO, ErrorVectorMessageDAO, ErrorCategoriesVectorDAO],
+    exports: [JobsDAO, ErrorVectorMessageDAO, ErrorCategoriesVectorDAO]
 })
 
 export class CouchbaseModule {}

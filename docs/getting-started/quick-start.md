@@ -135,7 +135,7 @@ curl http://localhost:3000/stats
                             -  The ideal 2-subscribers-pub-sub architecture described in the end, would have solve that. 
 
                             - However, there's still the fact that we currently use the query using the meta().id as the key to the JOIN, so if we would have wanted a fast-hash, we just would have needed to save the text as a field in the error message document.
-                            
+
                             - A real slow-hash which is hash-collision-proof but CPU intensive isn't a good fit, as it's consuming resources from the worker, of the same reasons the openAI embedding section described above explains.
 
                     - This design takes into account that upon cache misses there will be redundant calls to openAI and redundant upserts to both Redis & Couchbase, but it's a trade-off wer'e willing to take, as we optimistically assume that the error messages are limited and only once in a while there will be a cache-miss. 
@@ -145,7 +145,7 @@ curl http://localhost:3000/stats
 
             - Second subscriber can do the check in redis for a cache-hit/cache-miss, and in case of cache miss, call openAI, receive the response, and produce it to another pub-sub.
 
-            - The second pub-sub will have one which inserts it to redis, and the other to couchbase. This way we have complete eventual consistency (at the price of managing more services). This is the best solution because we vectorize for statistics, not for real-time critical application.
+            - The second pub-sub will have one which inserts it to redis, and the other to couchbase. This way we have complete eventual consistency without redundant openAI calls or Redis/Couchbase upserts (at the price of managing more services). This is the best solution because we vectorize for statistics, not for real-time critical application.
                 - I didn't implement in such way, mainly due to time constraints, but also because it's possibly a part of a wider application, and some other calculations might come into play, and this solution is good enough for a POC, as it does achieve eventual consistency, but at the cost of very likely redundant calls to openAI, and upserts to Redis & Couchbase, upon cache-miss.
     
     - Statistics:
@@ -156,9 +156,10 @@ curl http://localhost:3000/stats
             - The idea is that the team can "predict", that if a job has failed a given number of of times, it eventually will succeed(given the number of retries condigured), a percentage of the times (i.e the "success rate").
 
             - Success rate of concurrent jobs.
-            - The idea is to try and undestand if concurrent jobs are failing more than non concurrent ones, which could indicate that the resources are used wrongly.
+            - The idea is to try and undestand how often do concurrent jobs fail, which could indicate that the resources are used wrongly.
                 - This is a POC, so it's not 100%, but i'm aware of that. The current implementation treats "concurrent" as jobs that have been digested by the worker, not taking into account delays, so theoretically considering some non-really-concurrent jobs as concurrent.
                 - Also, ideally we would also want some understanding of whether the *number* of concurrent jobs affects the success rate, and not just a binary approach.
+                - Also, it doesn't compare
 
             - Vector search on the errors, by error categories (inserted dummy upon startup)
             - The idea is that the team has some list of error categories (e.g "C++ error", "Image processing error", "Memory exceeded", "Timeout", etc..), and the stats return for each error category, the success rate of jobs that failed with similar errors.

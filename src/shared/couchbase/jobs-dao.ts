@@ -77,11 +77,12 @@ export class JobsDAO extends BaseDAO {
         return await this.select({
             fields,
             groupBy: 'jobName', 
+            where: 'jobName IS VALUED',
             orderBy: 'MAX(updatedAt)'
         });
     }
 
-    async getErrorCategorySuccessRate(errorCategories: any[], errorVectorsCount: number) {
+    async getErrorCategorySuccessRate(errorCategories: any[]) {
 
         //what is the success rate of jobs that failed with errors
         let errorCategoriesPromises = [];
@@ -89,29 +90,18 @@ export class JobsDAO extends BaseDAO {
             const errorCategoriesQuery = `
             WITH MostSimilar AS(
                 SELECT
-                    results.text,
-                    results.score,
-                    results.type
-                FROM (
-                    SELECT
-                        meta(t).id as text,
-                        t.type,
-                        SEARCH_SCORE() as score
-                    FROM
-                        default._default.errorVectors AS t
-                    WHERE
-                        SEARCH(t.${'`'}value${'`'}, {
-                            "knn": [{
-                                "field": "value",
-                                "k": ${errorVectorsCount},
-                                "vector": [${errorCategory.value}]
-                            }]
-                        })
-                    )
-                AS 
-                    results
-                 WHERE 
-                    results.type = 'errorMessage'
+                    meta(t).id as text,
+                    SEARCH_SCORE() as score
+                FROM
+                    default._default.errorMessageVectors AS t
+                WHERE
+                    SEARCH(t.${'`'}value${'`'}, {
+                        "knn": [{
+                            "field": "value",
+                            "k": 3,
+                            "vector": [${errorCategory.value}]
+                        }]
+                    })
             ),
 
             MatchingErrorJobs AS (

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JOB_STATUS, ActiveJobDetails, CompletedJobDetails, FailedJobDetails } from '../../shared/models/job';
 import { JobsDAO } from '../../shared/couchbase/jobs-dao';
-import { ErrorVectorDAO, getErrorCategoryDocumentId } from '../../shared/couchbase/error-vector-dao';
+import { ErrorCategoriesVectorDAO } from '../../shared/couchbase/error-categories-vector-dao';
 import { OpenAIService } from '../../shared/vectorization/openai.service';
 import { DocumentExistsError } from 'couchbase';
 
@@ -9,7 +9,7 @@ import { DocumentExistsError } from 'couchbase';
 export class StatsService {
     constructor(
         private readonly openAIService: OpenAIService,
-        private readonly errorVectorDAO: ErrorVectorDAO,
+        private readonly errorCategoriesVectorDAO: ErrorCategoriesVectorDAO,
     ) {}
 
     async insertErrorCategories() {
@@ -26,13 +26,17 @@ export class StatsService {
         }
     }
     
-    async getEmbeddingAndInsert(errorCategory: string) {
+    private async getEmbeddingAndInsert(errorCategory: string) {
         try {
-            //TODO checkif exists and otherwise no need to do it and waste openAI calls and insertions catch
+            const errorCategoryExists = await this.errorCategoriesVectorDAO.getErrorCategory(errorCategory);
+            if (errorCategoryExists) {
+                console.log('ErrorVectorDAO: Error category already exists');
+                return;
+            }
             console.log('ErrorVectorDAO: Getting embedding for:', errorCategory);
             const errorVector = await this.openAIService.getEmbedding(errorCategory);
             console.log('ErrorVectorDAO: Got embedding, inserting to database');
-            return await this.errorVectorDAO.insertErrorCategory(errorCategory, errorVector);
+            return await this.errorCategoriesVectorDAO.insertErrorCategory(errorCategory, errorVector);
         } catch (error) {
             if (error instanceof DocumentExistsError) {
                 console.log('ErrorVectorDAO: Error inserting error category:', error);
