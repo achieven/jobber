@@ -89,32 +89,44 @@ export class JobsDAO extends BaseDAO {
             const errorCategoriesQuery = `
             WITH MostSimilar AS(
                 SELECT
-                    meta(t).id as text,
-                    SEARCH_SCORE() as score
-                FROM
-                    default._default.errorVectors AS t
-                WHERE
-                    t.${'`'}type${'`'} = 'errorMessage' AND
-                    SEARCH(t.${'`'}value${'`'}, {
-                        "knn": [{
-                            "field": "value",
-                            "k": ${errorVectorsCount},
-                            "vector": [${errorCategory.value}]
-                        }]
-                    })
+                    results.text,
+                    results.score,
+                    results.type
+                FROM (
+                    SELECT
+                        meta(t).id as text,
+                        t.type,
+                        SEARCH_SCORE() as score
+                    FROM
+                        default._default.errorVectors AS t
+                    WHERE
+                        SEARCH(t.${'`'}value${'`'}, {
+                            "knn": [{
+                                "field": "value",
+                                "k": ${errorVectorsCount},
+                                "vector": [${errorCategory.value}]
+                            }]
+                        })
+                    )
+                AS 
+                    results
+                 WHERE 
+                    results.type = 'errorMessage'
             ),
+
             MatchingErrorJobs AS (
                 SELECT 
                         j.status
                 FROM 
                     MostSimilar
                 JOIN 
-                    default._default.jobs j
-                ON 
-                    ARRAY e.error FOR e IN j.events WHEN e.status='failed' AND e.error = MostSimilar.text END
+                     default._default.jobs j
+                ON  
+                    MostSimilar.text IN (ARRAY e.error FOR e IN j.events WHEN e.status='failed' END)
                 LET
                     errorCategory = '${errorCategory.category}'
                 WHERE
+                    ANY e IN j.events SATISFIES e.status='failed' AND e.error IS VALUED END AND
                     MostSimilar.score > ${process.env.SUCCESS_VECTOR_MATCH_THRESHOLD || 0.4}
                 ORDER BY 
                     MostSimilar.score DESC
@@ -266,7 +278,7 @@ export class JobsDAO extends BaseDAO {
 
     async createArrayIndexes() {
         await this.createArrayIndex('job_start_time','(DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events))');
-        // await this.createArrayIndex('job_error', `(DISTINCT ARRAY e.error FOR e IN events WHEN e.status='${JOB_STATUS.FAILED}' END)`);
+        await this.createArrayIndex('job_error', `(DISTINCT ARRAY e.error FOR e IN events WHEN e.status='${JOB_STATUS.FAILED}' END)`);
 
         await this.waitTillIndexCreation();
     }

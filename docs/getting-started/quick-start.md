@@ -130,7 +130,12 @@ curl http://localhost:3000/stats
                         - This is crucial that Redis await the couchbase insertion, as otherwise Redis would have identified a cache-hit which is not in couchbase, therefore preventing eventual consistency for couchbase queried DB.
 
                     - Redis upserts this as key-value
-                        - Currently Redis (and couchbase) stores the key as the plain text rather than a fast-hash, which causes some memory overhead, but is at least fast-hash-collision proof, which makes it eventually consistent. The ideal 2-subscribers-pub-sub architecture described in the end, would have solve that.
+                        - Currently Redis (and couchbase) stores the key as the plain text rather than a fast-hash, which causes some memory overhead, but is at least fast-hash-collision proof, which makes it eventually consistent
+
+                            -  The ideal 2-subscribers-pub-sub architecture described in the end, would have solve that. 
+
+                            - However, there's still the fact that we currently use the query using the meta().id as the key to the JOIN, so if we would have wanted a fast-hash, we just would have needed to save the text as a field in the error message document.
+                            
                             - A real slow-hash which is hash-collision-proof but CPU intensive isn't a good fit, as it's consuming resources from the worker, of the same reasons the openAI embedding section described above explains.
 
                     - This design takes into account that upon cache misses there will be redundant calls to openAI and redundant upserts to both Redis & Couchbase, but it's a trade-off wer'e willing to take, as we optimistically assume that the error messages are limited and only once in a while there will be a cache-miss. 
