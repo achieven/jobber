@@ -55,6 +55,8 @@ services:
       COUCHBASE_PASSWORD: password
       SUCCESS_VECTOR_MATCH_THRESHOLD: 0.4
       NODE_ENV: local
+    env_file:
+      - .env
     depends_on:
       - redis
       - couchbase
@@ -76,6 +78,8 @@ services:
       COUCHBASE_PASSWORD: password
       CORES_PER_CPP_PROCESS: 1
       NODE_ENV: local
+    env_file:
+      - .env
     depends_on:
       - redis
       - couchbase
