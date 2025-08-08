@@ -20,7 +20,7 @@ export class StatsController {
     async getStats(@Res() res: Response) {
         try {
             if (process.env.NODE_ENV === 'local') {
-            await this.statsService.insertErrorCategories();
+                await this.statsService.insertErrorCategories();
             }
             const errorCategories = await this.errorVectorDAO.getErrorCategories();
             const errorVectorsCount = await this.errorVectorDAO.countErrorVectors();

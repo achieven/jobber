@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Collection, Bucket, Scope, CollectionQueryIndexManager, IndexExistsError } from 'couchbase';
+import { Collection, Bucket, Scope } from 'couchbase';
 import { couchbaseManager } from './connection-manager';
 
 @Injectable()
@@ -7,7 +7,6 @@ export abstract class BaseDAO {
     protected DEFAULT_LIMIT: number = 100;
     protected NO_LIMIT: string = 'no limit';
 
-    private static isInitialized = false;
 
     protected bucketName: string;
     protected scopeName: string;
@@ -16,6 +15,8 @@ export abstract class BaseDAO {
     protected _bucket: Bucket | null = null;
     protected _scope: Scope | null = null;
 
+    protected isInitialized: boolean = false;
+
     constructor(bucketName: string, scopeName: string = '_default', collectionName: string = '_default') {
         this.bucketName = bucketName;
         this.scopeName = scopeName;
@@ -23,12 +24,12 @@ export abstract class BaseDAO {
     }
 
     protected async ensureInitialized(): Promise<void> {
-        console.log(BaseDAO.isInitialized)
-        if (!BaseDAO.isInitialized) {
+        console.log(this.isInitialized, this.collectionName)
+        if (!this.isInitialized) {
             try {
                 await couchbaseManager.initialize();
                 this.ensureIndexes(this.collectionName);
-                BaseDAO.isInitialized = true;
+                this.isInitialized = true;
             } catch (error) {
                 console.error('Failed to initialize Couchbase connection:', error);
                 throw error;
@@ -105,7 +106,7 @@ export abstract class BaseDAO {
 
     protected async selectRaw(query: string): Promise<any> {
         const bucket = await this.bucket;
-        console.log(query);
+        // console.log(query);
         return (await bucket.cluster.query(query)).rows;
     }
 
@@ -124,40 +125,14 @@ export abstract class BaseDAO {
         return collection.mutateIn(key, specs, options);
     }
 
-    protected async ensureIndexes(collectionName: string): Promise<void> {
-        const collection = await this.collection;
-        const indexManager = new CollectionQueryIndexManager(collection);
-        const indexCreationOptions = {
-            ignoreIfExists: true,
-            deferred: true
-        }
+    protected async ensureIndexes(collectionName: string): Promise<void> {}
 
-        await indexManager.createIndex('jobs_summary', 
-            ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
-            indexCreationOptions
-        );
-
-        await indexManager.createIndex('jobs_per_attempts', 
-            ['attempts',  'status'],
-            indexCreationOptions
-        );
-
-        await this.createArrayIndexes();
-
-        await indexManager.buildDeferredIndexes();
-    }
-
-    async createArrayIndexes() {
-        try {
-            await (await this.bucket).cluster.query(
-                `CREATE INDEX job_start_time ON ${this.bucketName}.${this.scopeName}.${this.collectionName} (DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events)) WITH {"defer_build": true}`
-            );
-        } catch (error) {
-            if (!(error instanceof IndexExistsError)) {
-                throw error;
-            }
-            await waitTillIndexCreation();
-        }
+    async waitTillIndexCreation() {
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve(true);
+            }, 1000);
+        })
     }
 } 
 
@@ -165,10 +140,3 @@ export abstract class BaseDAO {
 //also, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it
 
 
-async function waitTillIndexCreation() {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            resolve(true);
-        }, 10000);
-    })
-}

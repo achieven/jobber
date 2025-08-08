@@ -126,7 +126,7 @@ curl http://localhost:3000/stats
                     - Spawning a new child process or worker thread, is conceptually somewhat similar in a way to ollama (especially child process), therefore a no-go as well due to the limited CPU cores we have
 
                 - After receiving response from openAI:
-                    - First upsert it to couchbase, as couchbase is the single source of truth
+                    - First upsert it to couchbase, as couchbase is the single source of truth.
                         - This is crucial that Redis await the couchbase insertion, as otherwise Redis would have identified a cache-hit which is not in couchbase, therefore preventing eventual consistency for couchbase queried DB.
 
                     - Redis upserts this as key-value
@@ -142,6 +142,24 @@ curl http://localhost:3000/stats
 
             - The second pub-sub will have one which inserts it to redis, and the other to couchbase. This way we have complete eventual consistency (at the price of managing more services). This is the best solution because we vectorize for statistics, not for real-time critical application.
                 - I didn't implement in such way, mainly due to time constraints, but also because it's possibly a part of a wider application, and some other calculations might come into play, and this solution is good enough for a POC, as it does achieve eventual consistency, but at the cost of very likely redundant calls to openAI, and upserts to Redis & Couchbase, upon cache-miss.
+    
+    - Statistics:
+        - Get jobs:
+
+        - Get stats:
+            - Grouping by the number of up-to-attemps. 
+            - The idea is that the team can "predict", that if a job has failed a given number of of times, it eventually will succeed(given the number of retries condigured), a percentage of the times (i.e the "success rate").
+
+            - Success rate of concurrent jobs.
+            - The idea is to try and undestand if concurrent jobs are failing more than non concurrent ones, which could indicate that the resources are used wrongly.
+                - This is a POC, so it's not 100%, but i'm aware of that. The current implementation treats "concurrent" as jobs that have been digested by the worker, not taking into account delays, so theoretically considering some non-really-concurrent jobs as concurrent.
+                - Also, ideally we would also want some understanding of whether the *number* of concurrent jobs affects the success rate, and not just a binary approach.
+
+            - Vector search on the errors, by error categories (inserted dummy upon startup)
+            - The idea is that the team has some list of error categories (e.g "C++ error", "Image processing error", "Memory exceeded", "Timeout", etc..), and the stats return for each error category, the success rate of jobs that failed with similar errors.
+                - There is a known issue i'm aware of, which the "k" is applied on the total number of items, instead of conly on the error messages, so it includes the error categories, as it's within the same collection, therefore the first one is abviously the error category itself (and also the other errors categories are usually more similar to the queried error category).
+                - The threshold for passing as a "matching" error is 0.4, which I found is giving some filters to the dummy error categories i supplied, and to the dummy errors i used in the C++ app.
+                - I'm using the openAI model of "text-embedding-3-small" for this POC. For sure there are better models that are more adequate for programmatic terms, or even a sub-nieche of programming errors (maybe).
 
 ## 
 

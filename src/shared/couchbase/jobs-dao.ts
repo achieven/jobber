@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MutateInSpec, MutateInResult } from 'couchbase';
+import { MutateInSpec, MutateInResult, CollectionQueryIndexManager, IndexExistsError } from 'couchbase';
 import { BaseDAO } from './base-dao';
 import { JOB_STATUS } from '../models/job';
 
@@ -242,6 +242,46 @@ export class JobsDAO extends BaseDAO {
         `
 
         return await this.selectRaw(perConcurrentJobsQuery);
+    }
+
+    protected async ensureIndexes() {
+        const collection = await this.collection;
+        const indexManager = new CollectionQueryIndexManager(collection);
+        const indexCreationOptions = {
+            ignoreIfExists: true,
+            deferred: true
+        }
+
+        await indexManager.createIndex('jobs_summary', 
+            ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
+            indexCreationOptions
+        );
+        await indexManager.createIndex('jobs_per_attempts', 
+            ['attempts',  'status'],
+            indexCreationOptions
+        );
+        await this.createArrayIndexes();
+        await indexManager.buildDeferredIndexes();
+    }
+
+    async createArrayIndexes() {
+        await this.createArrayIndex('job_start_time','(DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events))');
+        // await this.createArrayIndex('job_error', `(DISTINCT ARRAY e.error FOR e IN events WHEN e.status='${JOB_STATUS.FAILED}' END)`);
+
+        await this.waitTillIndexCreation();
+    }
+
+    async createArrayIndex(indexName:string, keys: string) {
+        try {
+            const buildIndexQuery = `CREATE INDEX ${indexName} ON ${this.bucketScopeCollection} ${keys} WITH {"defer_build": true}`
+            console.log(buildIndexQuery)
+            await (await this.bucket).cluster.query(buildIndexQuery);
+        } catch (error) {
+            if (!(error instanceof IndexExistsError)) {
+                throw error;
+            }
+            await this.waitTillIndexCreation();
+        }
     }
 }
 
