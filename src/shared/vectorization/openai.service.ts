@@ -16,14 +16,12 @@ export class OpenAIService {
     async getEmbedding(text: string) {
         console.log('openai get embedding')
         try {
-            // Call the OpenAI embeddings API
             const response = await this.openai.embeddings.create({
-                model: "text-embedding-3-small", // You can also use "text-embedding-3-large"
+                model: "text-embedding-3-small",
                 input: text,
                 encoding_format: "float",
             });
         
-            // The vector is located in the 'embedding' property of the first data object
             return response.data[0].embedding;
         } catch (error) {
             console.error("Error generating embedding:", error);

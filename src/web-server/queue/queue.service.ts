@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { getQueueOptions } from '../../shared/queue/queue';
+import { QueueConfigService } from '../../shared/queue/queue.service';
 import { JobPayload } from '../../shared/models/job';
 
 @Injectable()
 export class QueueService {
-    constructor(@InjectQueue(getQueueOptions().name) private myJobQueue: Queue) {}
+    constructor(
+        @InjectQueue(QueueConfigService.QUEUE_NAME) private myJobQueue: Queue
+    ) {}
 
     async addJobToQueue(payload: JobPayload) {
         const job = await this.myJobQueue.add(payload.jobName, payload.arguments);

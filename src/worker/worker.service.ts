@@ -1,16 +1,18 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Worker, Job } from 'bullmq';
-import { getQueueOptions, getWorkerOptions } from '../shared/queue/queue';
-import { getConnectionOptions } from '../shared/redis/redis.config';
+import { QueueConfigService } from '../shared/queue/queue.service';
 import { JobsService } from './jobs/jobs.service';
 import { JOB_STATUS } from '../shared/models/job';
 import { executeCppJob } from './jobs/cpp-job-executor';
 
 @Injectable()
-export class WorkerService implements OnModuleInit {
+export class WorkerService implements OnModuleInit, OnModuleDestroy {
     private worker: Worker;
 
-    constructor(private readonly jobsService: JobsService) {}
+    constructor(
+        private readonly jobsService: JobsService,
+        private readonly queueConfigService: QueueConfigService,
+    ) {}
 
     async onModuleInit() {
         this.initializeWorker();
@@ -18,7 +20,7 @@ export class WorkerService implements OnModuleInit {
 
     private initializeWorker() {
         this.worker = new Worker(
-            getQueueOptions().name,
+            QueueConfigService.QUEUE_NAME,
             async (job: Job) => {
                 console.log(`[${new Date().toISOString()}] Processing job ${job.id} (attempt ${job.attemptsMade + 1}/${job.opts.attempts}) with data: ${JSON.stringify(job.data)}`);
 
@@ -36,7 +38,7 @@ export class WorkerService implements OnModuleInit {
                     throw error;
                 }
             },
-            getWorkerOptions(getConnectionOptions()),
+            this.queueConfigService.getWorkerOptions(),
         );
 
         this.setupEventHandlers();

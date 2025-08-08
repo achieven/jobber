@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { CouchbaseModule } from '../../shared/couchbase/couchbase.module';
-import { OpenAIService } from '../../shared/vectorization/openai.service';
+import { VectorizationModule } from '../../shared/vectorization/vectorization.module';
 
 @Module({
-    imports: [CouchbaseModule],
-    providers: [JobsService, OpenAIService],
+    imports: [CouchbaseModule, VectorizationModule],
+    providers: [JobsService],
     exports: [JobsService]
 })
 export class JobsModule {} 
