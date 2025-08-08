@@ -78,19 +78,7 @@ curl http://localhost:3000/jobs
 curl http://localhost:3000/stats
 ```
 
-## 🎯 What Just Happened?
-
-1. **Docker Compose** started three services:
-   - **Web Server** (port 3000) - REST API for job management
-   - **Worker** - Processes C++ jobs from the queue
-   - **Couchbase** 
-        - Document database for job storage
-        - Hosting error as vectors, for performing the stats part that check success rate per error category (which is being dummy inserted upon startup)
-   - **Redis** - Acting in multiple roles:
-        - Queue, using BullMQ
-        - Cache - Storing text and vector as key-value pair, for fast, local, check every time the job is failed
-
-2. **Job Flow**:
+1. **Job Flow**:
    - Job submitted via REST API
 
    - Queued in Redis via BullMQ
@@ -149,7 +137,11 @@ curl http://localhost:3000/stats
                 - I didn't implement in such way, mainly due to time constraints, but also because it's possibly a part of a wider application, and some other calculations might come into play, and this solution is good enough for a POC, as it does achieve eventual consistency, but at the cost of very likely redundant calls to openAI, and upserts to Redis & Couchbase, upon cache-miss.
     
     - Statistics:
-        - Get jobs:
+        - Get jobs - groups the jobs by their job name and returns the following fields for each group:
+            - A counter for each type of the jobs (active/failed/completed)
+            - A list of all the job ids of this job name
+            - A list of all the jobs of this job name that are currently running (for team to be able to track it live)
+            - The latest job invocation (by the last update time) - same structure as the list of currency running jobs
 
         - Get stats:
             - Grouping by the number of up-to-attemps. 

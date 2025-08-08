@@ -72,7 +72,11 @@ export class JobsDAO extends BaseDAO {
             SUM(CASE WHEN status = '${JOB_STATUS.FAILED}' THEN 1 ELSE 0 END) AS failedCount,
             SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END) AS completedCount,
             ARRAY_AGG(jobId) AS allJobIds,
-            ARRAY_AGG(CASE WHEN status = '${JOB_STATUS.ACTIVE}' THEN ARRAY event for event in events when event.status = '${JOB_STATUS.ACTIVE}' END END) AS activeJobs
+            ARRAY job FOR job IN (
+                ARRAY_AGG(CASE WHEN status = '${JOB_STATUS.ACTIVE}' THEN 
+                    ARRAY event for event in events when event.status = '${JOB_STATUS.ACTIVE}' END 
+                END)
+            ) WHEN job IS VALUED END AS activeJobs
             `;
         return await this.select({
             fields,

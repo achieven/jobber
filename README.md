@@ -54,11 +54,14 @@ Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 
 Jobber consists of:
 
-- **Web Server** (NestJS) - REST API for job management
-- **Worker Service** (NestJS) - Job execution engine
-- **Couchbase** - Low-latency Document database, also storing embedded vectors
-- **Redis** - Queue backend for BullMQ, as well as fast, local, Cache hit/miss for to-be-vectorized data
-- **C++ Jobs** - Custom executable job logic
+- **Web Server** (port 3000) - REST API for job management
+- **Worker** - Processes C++ jobs from the queue
+- **Couchbase** 
+    - Low-latency Document database for job data storage
+    - Hosting error as vectors, for performing the stats part that check success rate per error category (which is being dummy inserted upon startup)
+- **Redis** - Acting in multiple roles:
+    - Queue, using BullMQ
+    - Cache - Storing text pair, for fast, local, check every time the job is failed
 
 ## Architecture Agenda
 
