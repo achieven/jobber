@@ -1,9 +1,19 @@
-import { MutateInSpec, MutateInResult } from 'couchbase';
+import { Injectable } from '@nestjs/common';
+import { MutateInSpec, MutateInResult, CollectionQueryIndexManager, IndexExistsError } from 'couchbase';
 import { BaseDAO } from './base-dao';
 import { JOB_STATUS } from '../models/job';
 
 const getJobDocumentId = (jobId: string, jobName: string) => `jobEvent:${jobId}:${jobName}`;
 
+const successRateAs = 'successRatePercentage';
+const sumCompletedJobsAs = 'completedJobs';
+const whatToCount = Math.random().toString();
+const whatToCallIt = Math.random().toString();
+const sumAllOccurencesAsField = `COUNT(${whatToCount}) AS ${whatToCallIt}`;
+const successRatePercentageAsField = `COALESCE(ROUND(SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END) * 100.0 / COUNT(${whatToCount}), 2), 0) AS ${successRateAs}`
+const sumCompletedJobsAsField = `COALESCE(SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END), 0) AS ${sumCompletedJobsAs}`
+
+@Injectable()
 export class JobsDAO extends BaseDAO {
     constructor() {
         super('default', '_default', 'jobs');
@@ -62,32 +72,84 @@ export class JobsDAO extends BaseDAO {
             SUM(CASE WHEN status = '${JOB_STATUS.FAILED}' THEN 1 ELSE 0 END) AS failedCount,
             SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END) AS completedCount,
             ARRAY_AGG(jobId) AS allJobIds,
-            ARRAY_AGG(CASE WHEN status = '${JOB_STATUS.ACTIVE}' THEN ARRAY event for event in events when event.status = '${JOB_STATUS.ACTIVE}' END END) AS activeJobs
-            `
-        return await this.select(
-            {
-                fields,
-                groupBy: 'jobName', 
-                orderBy: 'MAX(updatedAt)'
-            }
-        );
+            ARRAY job FOR job IN (
+                ARRAY_AGG(CASE WHEN status = '${JOB_STATUS.ACTIVE}' THEN 
+                    ARRAY event for event in events when event.status = '${JOB_STATUS.ACTIVE}' END 
+                END)
+            ) WHEN job IS VALUED END AS activeJobs
+            `;
+        return await this.select({
+            fields,
+            groupBy: 'jobName', 
+            where: 'jobName IS VALUED',
+            orderBy: 'MAX(updatedAt)'
+        });
     }
 
-    async getStats() {
-        const bucketScopeCollection = `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
-        const successRateAs = 'successRatePercentage';
-        const sumCompletedJobsAs = 'completedJobs';
-        const whatToCount = Math.random().toString();
-        const successRatePercentageAsField = `ROUND(SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END) * 100.0 / COUNT(${whatToCount}), 2) AS ${successRateAs}`
-        const sumCompletedJobsAsField = `SUM(CASE WHEN status = '${JOB_STATUS.COMPLETED}' THEN 1 ELSE 0 END) AS ${sumCompletedJobsAs}`
-        
+    async getErrorCategorySuccessRate(errorCategories: any[]) {
+
+        //what is the success rate of jobs that failed with errors
+        let errorCategoriesPromises = [];
+        for (let errorCategory of errorCategories) {
+            const errorCategoriesQuery = `
+            WITH MostSimilar AS(
+                SELECT
+                    meta(t).id as text,
+                    SEARCH_SCORE() as score
+                FROM
+                    default._default.errorMessageVectors AS t
+                WHERE
+                    SEARCH(t.${'`'}value${'`'}, {
+                        "knn": [{
+                            "field": "value",
+                            "k": 3,
+                            "vector": [${errorCategory.value}]
+                        }]
+                    })
+            ),
+
+            MatchingErrorJobs AS (
+                SELECT 
+                        j.status
+                FROM 
+                    MostSimilar
+                JOIN 
+                     default._default.jobs j
+                ON  
+                    MostSimilar.text IN (ARRAY e.error FOR e IN j.events WHEN e.status='failed' END)
+                LET
+                    errorCategory = '${errorCategory.category}'
+                WHERE
+                    ANY e IN j.events SATISFIES e.status='failed' AND e.error IS VALUED END AND
+                    MostSimilar.score > ${process.env.SUCCESS_VECTOR_MATCH_THRESHOLD || 0.4}
+                ORDER BY 
+                    MostSimilar.score DESC
+            )
+
+            SELECT
+                '${errorCategory.category}' AS errorCategory,
+                ${sumAllOccurencesAsField.replaceAll(whatToCount, '*').replaceAll(whatToCallIt, 'totalErrorCategoryJobs')},
+                ${sumCompletedJobsAsField},
+                ${successRatePercentageAsField.replaceAll(whatToCount, 'MatchingErrorJobs')}
+            FROM
+                MatchingErrorJobs
+    `
+    
+    errorCategoriesPromises.push(this.selectRaw(errorCategoriesQuery));
+        }
+
+        const errorCategoriesResults = await Promise.all(errorCategoriesPromises);
+        return errorCategoriesResults;
+    }
+
+    async getPerAttemptsStats() {
         const perAttemptsStatsQuery = `
             SELECT 
                 t1.attempts AS attemptsUpTo,
                 (SELECT 
                     COUNT(t2) as countTotalJobs
                 FROM 
-                    ${bucketScopeCollection} AS t2
+                    ${this.bucketScopeCollection} AS t2
                 WHERE
                     t2.attempts >= t1.attempts
                 )[0].countTotalJobs 
@@ -96,7 +158,7 @@ export class JobsDAO extends BaseDAO {
                 (SELECT 
                     ${sumCompletedJobsAsField}
                 FROM 
-                    ${bucketScopeCollection} AS t2
+                    ${this.bucketScopeCollection} AS t2
                 WHERE
                     t2.attempts >= t1.attempts
                 )[0].${sumCompletedJobsAs}
@@ -105,7 +167,7 @@ export class JobsDAO extends BaseDAO {
                 (SELECT
                     ${successRatePercentageAsField.replaceAll(whatToCount, '*')}
                 FROM
-                    ${bucketScopeCollection} AS t2
+                    ${this.bucketScopeCollection} AS t2
                 WHERE
                     t2.attempts >= t1.attempts
                 )[0].${successRateAs}
@@ -114,7 +176,7 @@ export class JobsDAO extends BaseDAO {
                 SELECT 
                     DISTINCT attempts
                 FROM 
-                    ${bucketScopeCollection}
+                    ${this.bucketScopeCollection}
                 WHERE 
                     attempts IS NOT MISSING
             ) 
@@ -122,8 +184,13 @@ export class JobsDAO extends BaseDAO {
             ORDER BY 
                 t1.attempts
         `
-        
 
+        return await this.selectRaw(perAttemptsStatsQuery);
+    }
+
+    async getPerConcurrentJobsStats() {
+        //possibly with postgres it might have been able to leverage the timeseries feature to do the window matching.
+        //either way, couchbase's time-series function doesn't help us here, except possibly for indexing, but not at the level of querying essentially different
         const perConcurrentJobsQuery = `
             WITH JobTimeWindows AS (
                 -- Step 1: Calculate the active time window for each job.
@@ -136,7 +203,7 @@ export class JobsDAO extends BaseDAO {
                     d.updatedAt AS rootUpdatedAt,
                     (SELECT MIN(e.updatedAt) as startTime FROM d.events AS e WHERE e.status = '${JOB_STATUS.ACTIVE}')[0].startTime AS firstActiveEventUpdatedAt
                 FROM 
-                    ${bucketScopeCollection} AS d
+                    ${this.bucketScopeCollection} AS d
                 WHERE
                     d IS NOT MISSING
                     AND d.events IS NOT MISSING
@@ -173,27 +240,54 @@ export class JobsDAO extends BaseDAO {
             )
             -- Step 4: Calculate the success rate for the identified concurrent jobs.
             SELECT
-                COUNT(jtw.jobId) AS totalConcurrentJobs,
+                ${sumAllOccurencesAsField.replaceAll(whatToCount, 'jtw').replaceAll(whatToCallIt, 'totalConcurrentJobs')},
                 ${sumCompletedJobsAsField.replaceAll('status', 'jtw.status')},
                 ${successRatePercentageAsField.replaceAll(whatToCount, 'jtw').replaceAll('status', 'jtw.status')}
             FROM JobTimeWindows AS jtw
             JOIN ConcurrentJobs AS cj ON jtw.jobId = cj.jobId
-            --
         `
 
-        let promises = [
-            this.selectRaw(perAttemptsStatsQuery),
-            this.selectRaw(perConcurrentJobsQuery)
-        ];
+        return await this.selectRaw(perConcurrentJobsQuery);
+    }
 
+    protected async ensureIndexes() {
+        const collection = await this.collection;
+        const indexManager = new CollectionQueryIndexManager(collection);
+        const indexCreationOptions = {
+            ignoreIfExists: true,
+            deferred: true
+        }
 
-        //averate duration, average retries
-        //success rate per retries (0/1/2) - done
-        //success rate per concurrent jobs vs non concurrent jobs - done
-        //success rate per duration (0-10ms, 10-20ms, ... 90-10ms, ...)
-        //success rate per jobName
-        //success rate per error message
-        //success rate per analysts asking questions (e.g analyst asks: "was there a job that failed with c++ error"? -> searches in the error messages and checks similar values)
-        return await Promise.all(promises);
+        await indexManager.createIndex('jobs_summary', 
+            ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
+            indexCreationOptions
+        );
+        await indexManager.createIndex('jobs_per_attempts', 
+            ['attempts',  'status'],
+            indexCreationOptions
+        );
+        await this.createArrayIndexes();
+        await indexManager.buildDeferredIndexes();
+    }
+
+    async createArrayIndexes() {
+        await this.createArrayIndex('job_start_time','(DISTINCT ARRAY e.status FOR e IN events END, ARRAY_COUNT(events))');
+        await this.createArrayIndex('job_error', `(DISTINCT ARRAY e.error FOR e IN events WHEN e.status='${JOB_STATUS.FAILED}' END)`);
+
+        await this.waitTillIndexCreation();
+    }
+
+    async createArrayIndex(indexName:string, keys: string) {
+        try {
+            const buildIndexQuery = `CREATE INDEX ${indexName} ON ${this.bucketScopeCollection} ${keys} WITH {"defer_build": true}`
+            console.log(buildIndexQuery)
+            await (await this.bucket).cluster.query(buildIndexQuery);
+        } catch (error) {
+            if (!(error instanceof IndexExistsError)) {
+                throw error;
+            }
+            await this.waitTillIndexCreation();
+        }
     }
 }
+

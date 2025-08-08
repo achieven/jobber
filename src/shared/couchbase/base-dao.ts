@@ -1,11 +1,12 @@
-import { Collection, Bucket, Scope, CollectionQueryIndexManager } from 'couchbase';
+import { Injectable } from '@nestjs/common';
+import { Collection, Bucket, Scope } from 'couchbase';
 import { couchbaseManager } from './connection-manager';
 
+@Injectable()
 export abstract class BaseDAO {
     protected DEFAULT_LIMIT: number = 100;
     protected NO_LIMIT: string = 'no limit';
 
-    private static isInitialized = false;
 
     protected bucketName: string;
     protected scopeName: string;
@@ -14,19 +15,21 @@ export abstract class BaseDAO {
     protected _bucket: Bucket | null = null;
     protected _scope: Scope | null = null;
 
+    protected isInitialized: boolean = false;
+
     constructor(bucketName: string, scopeName: string = '_default', collectionName: string = '_default') {
         this.bucketName = bucketName;
         this.scopeName = scopeName;
         this.collectionName = collectionName;
     }
 
-    private async ensureInitialized(): Promise<void> {
-        console.log(BaseDAO.isInitialized)
-        if (!BaseDAO.isInitialized) {
+    protected async ensureInitialized(): Promise<void> {
+        console.log(this.isInitialized, this.collectionName)
+        if (!this.isInitialized) {
             try {
                 await couchbaseManager.initialize();
                 this.ensureIndexes(this.collectionName);
-                BaseDAO.isInitialized = true;
+                this.isInitialized = true;
             } catch (error) {
                 console.error('Failed to initialize Couchbase connection:', error);
                 throw error;
@@ -45,6 +48,10 @@ export abstract class BaseDAO {
 
     get scope(): Promise<Scope> {
         return this.getScopeInternal();
+    }
+
+    get bucketScopeCollection(): string {
+        return `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
     }
 
     private async getCollectionInternal(): Promise<Collection> {
@@ -71,14 +78,8 @@ export abstract class BaseDAO {
         return this._scope;
     }
 
-    protected async selectRaw(query: string): Promise<any> {
-        const bucket = await this.bucket;
-        console.log(query);
-        return (await bucket.cluster.query(query)).rows;
-    }
-
-    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string, from? : string }): Promise<any> {
-        let { fields, where, groupBy, orderBy, limit, offset, from } = options;
+    protected async select(options: { fields: string, where?: string, groupBy?: string, orderBy?: string, limit?: number | string, offset?: number | string }): Promise<any> {
+        let { fields, where, groupBy, orderBy, limit, offset } = options;
         fields = fields || '*';
         where = where || '';
         groupBy = groupBy || '';
@@ -89,11 +90,10 @@ export abstract class BaseDAO {
             this.DEFAULT_LIMIT
         );
         offset = offset || '';
-        from = from || `${this.bucketName}.${this.scopeName}.${this.collectionName}`;
 
         const bucket = await this.bucket;
         const query = `SELECT ${fields} 
-            FROM ${from} 
+            FROM ${this.bucketScopeCollection} 
             ${where   ? `WHERE ${where}`      : where} 
             ${groupBy ? `GROUP BY ${groupBy}` : groupBy} 
             ${orderBy ? `ORDER BY ${orderBy}` : orderBy} 
@@ -104,36 +104,39 @@ export abstract class BaseDAO {
         return (await bucket.cluster.query(query)).rows;
     }
 
+    protected async selectRaw(query: string): Promise<any> {
+        const bucket = await this.bucket;
+        console.log(query);
+        return (await bucket.cluster.query(query)).rows;
+    }
+
+    protected async upsert(key: string, value: any) {
+        const collection = await this.collection;
+        return collection.upsert(key, value);
+    }
+
+    protected async insert(key: string, value: any) {
+        const collection = await this.collection;
+        return collection.insert(key, value);
+    }
+
     protected async mutateIn(key: string, specs: any[], options?: any): Promise<any> {
         const collection = await this.collection;
         return collection.mutateIn(key, specs, options);
     }
 
-    protected async ensureIndexes(collectionName: string): Promise<void> {
-        const collection = await this.collection;
-        const indexManager = new CollectionQueryIndexManager(collection);
-        await indexManager.createPrimaryIndex({
-            ignoreIfExists: true,
-            deferred: true
-        });
-        await indexManager.createIndex('jobs_summary', 
-            ['jobName',  'updatedAt DESC', 'TO_NUMBER(jobId) DESC', 'status', 'events'],
-           {
-            ignoreIfExists: true,
-            deferred: true
-           } 
-        );
+    protected async ensureIndexes(collectionName: string): Promise<void> {}
 
-        await indexManager.createIndex('jobs_per_attempts', 
-            ['attempts',  'status'],
-           {
-            ignoreIfExists: true,
-            deferred: true
-           } 
-        );
-        /*
-        explain CREATE INDEX idx_job_summary ON `default`.`_default`.`jobs`(jobName, updatedAt DESC, status, ALL ARRAY e.status FOR e IN events END)
-        */
-        await indexManager.buildDeferredIndexes();
+    async waitTillIndexCreation() {
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                resolve(true);
+            }, 1000);
+        })
     }
 } 
+
+//sdk doesn't seem to handle array indexes and treats it like a field index, with backticks surrounding
+//also, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it
+
+

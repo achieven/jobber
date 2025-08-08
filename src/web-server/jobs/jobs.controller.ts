@@ -4,11 +4,13 @@ import { QueueService } from '../queue/queue.service';
 import { JobPayload } from '../../shared/models/job';
 import { JobsDAO } from '../../shared/couchbase/jobs-dao';
 
-const jobsDAO = new JobsDAO();
 
 @Controller('jobs')
 export class JobsController {
-    constructor(private readonly queueService: QueueService) {}
+    constructor(
+        private readonly queueService: QueueService,
+        private readonly jobsDAO: JobsDAO,
+    ) {}
     
     @Post('/')
     async postJob(@Body() payload: JobPayload, @Res() res: Response) {
@@ -31,7 +33,7 @@ export class JobsController {
     @Get('/')
     async getJobs(@Res() res: Response) {
         try {
-            const jobs = await jobsDAO.getJobs();
+            const jobs = await this.jobsDAO.getJobs();
             return res.status(HttpStatus.ACCEPTED).json({
                 jobs
             });

@@ -3,22 +3,20 @@ WORKDIR /usr/src/cpp_app
 COPY ./src/worker/jobs ./src/worker/jobs
 RUN mkdir -p dist/worker/jobs && g++ -static src/worker/jobs/dummy-job.cpp -o dist/worker/jobs/dummy-job
 
-FROM node:18-alpine AS node_builder
+FROM node:18-alpine AS builder
 WORKDIR /usr/src/app
-COPY package.json package-lock.json ./
+COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build webServer
+RUN npm run buildWorker
 
 FROM node:18-alpine AS runner
 WORKDIR /usr/src/app
-COPY --from=cpp_builder /usr/src/cpp_app/dist/worker/jobs ./dist/worker/jobs
-COPY --from=node_builder /usr/src/app/dist/worker ./dist//worker
-COPY --from=node_builder /usr/src/app/dist/shared ./dist/shared
-COPY --from=node_builder /usr/src/app/node_modules ./node_modules
-COPY --from=node_builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/dist/worker ./dist/worker
+COPY --from=builder /usr/src/app/dist/shared ./dist/shared
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=cpp_builder /usr/src/cpp_app/dist/worker/jobs/* ./dist/worker/jobs
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-USER appuser
-
-CMD ["node", "dist/worker/worker.js"] 
+EXPOSE 3000
+CMD ["node", "dist/worker/worker-app.js"] 
