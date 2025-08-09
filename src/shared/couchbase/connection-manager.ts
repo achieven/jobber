@@ -49,7 +49,6 @@ class CouchbaseConnectionManager {
 
         try {
             console.log('Initializing Couchbase connection...');
-            console.log('Connection config:', this.config);
             
             this.cluster = await connect(`couchbase://${this.config.host}`, {
                 username: this.config.username,
@@ -85,7 +84,6 @@ class CouchbaseConnectionManager {
         }
 
         try {
-            console.log(`Getting bucket '${bucketName}'`);
             const bucket = this.cluster.bucket(bucketName);
             this.buckets.set(bucketName, bucket);
             console.log(`Bucket '${bucketName}' connected successfully`);
@@ -98,7 +96,6 @@ class CouchbaseConnectionManager {
 
     async getCollection(bucketName: string, scopeName: string = '_default', collectionName: string = '_default'): Promise<Collection> {
         const cacheKey = `${bucketName}:${scopeName}:${collectionName}`;
-        console.log(this.collections);
         
         // Check if collection already exists in cache
         if (this.collections.has(cacheKey)) {
@@ -107,7 +104,6 @@ class CouchbaseConnectionManager {
 
         const bucket = await this.getBucket(bucketName);
         const scope = bucket.scope(scopeName);
-        console.log(`Getting collection '${collectionName}' in scope '${scopeName}' in bucket '${bucketName}'`);
         const collection = scope.collection(collectionName);
         
         this.collections.set(cacheKey, collection);
