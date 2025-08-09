@@ -1,0 +1,7 @@
+FROM couchbase/server:enterprise-7.6.2
+RUN apt-get update && apt-get install -y dos2unix
+
+COPY ./couchbase/configure-node.windows.sh /opt/couchbase
+RUN dos2unix /opt/couchbase/configure-node.windows.sh
+RUN chmod +x /opt/couchbase/configure-node.windows.sh
+CMD ["/opt/couchbase/configure-node.windows.sh"]

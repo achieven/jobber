@@ -18,7 +18,8 @@ export class StatsService {
             'Javascript error',
             'Image processing error',
             'Memory quota exceeded',
-            'Timeout'
+            'Timeout',
+            'Null pointer exception',
         ]
 
         for (const errorCategory of errorCategories) {
@@ -28,7 +29,8 @@ export class StatsService {
     
     private async getEmbeddingAndInsert(errorCategory: string) {
         try {
-            const errorCategoryExists = await this.errorCategoriesVectorDAO.getErrorCategory(errorCategory);
+            const errorCategoryExists = (await this.errorCategoriesVectorDAO.getErrorCategory(errorCategory)).length > 0;
+            console.log('errorCategoryExists', errorCategoryExists);
             if (errorCategoryExists) {
                 console.log('ErrorVectorDAO: Error category already exists');
                 return;

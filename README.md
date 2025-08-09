@@ -25,6 +25,10 @@ cp .env.example .env
 
 # Start the system
 docker compose up -d
+# For windows users
+change the compose.yml entry in couchbase to
+  dockerfile: Dockerfile.windows.couchbase
+before running the docker compose up command
 
 # Wait for Couchbase to initialize (60 seconds)
 sleep 60
@@ -50,6 +54,9 @@ Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 - **[Job Development](./docs/development/job-development.md)** - Create custom C++ jobs
 - **[Deployment Guide](./docs/operations/deployment.md)** - Production deployment
 
+## Troubleshooting
+
+- Couchase not working
 ## 🏗️ Architecture
 
 Jobber consists of:
