@@ -1,4 +1,4 @@
-# Architecture Overview
+# Architecture and Flow Overview
 
 ## Current Architecture
 

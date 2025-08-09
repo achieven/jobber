@@ -39,6 +39,8 @@ export class ErrorCategoriesVectorDAO extends BaseDAO {
             deferred: true
         }
 
+        await indexManager.createIndex('category_index', ['category'], indexCreationOptions);
+
         await indexManager.buildDeferredIndexes();
     }
 }

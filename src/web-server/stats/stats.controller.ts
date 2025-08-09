@@ -24,11 +24,21 @@ export class StatsController {
                 this.jobsDAO.getPerConcurrentJobsStats(),
                 this.jobsDAO.getErrorCategorySuccessRate(errorCategories)
             ];
-            const jobStats = await Promise.all(promises);
+            const jobStatsPromises = await Promise.all(promises);
+            const jobStats = {
+                perAttemptsStats: jobStatsPromises[0],
+                perConcurrentJobsStats: jobStatsPromises[1][0],
+                errorCategorySuccessRate: jobStatsPromises[2].map((categoryStats) => {
+                    const category = categoryStats[0];
+                    const categoryName = category.errorCategory;
+                    delete category.errorCategory;
+                    return {
+                        [categoryName]: category
+                    }
+                })
+            }
             return res.status(HttpStatus.ACCEPTED).json({
-                stats: {
-                    jobStats: jobStats
-                }
+                jobStats
             });
         } catch (error) {
             console.error('Error submitting job:', error);

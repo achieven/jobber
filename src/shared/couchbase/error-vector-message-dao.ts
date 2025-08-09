@@ -19,10 +19,6 @@ export class ErrorVectorMessageDAO extends BaseDAO {
     protected async ensureIndexes() {
         const collection = await this.collection;
         const indexManager = new CollectionQueryIndexManager(collection);
-        const indexCreationOptions = {
-            ignoreIfExists: true,
-            deferred: true
-        }
         
         await this.createSearchIndex();
 

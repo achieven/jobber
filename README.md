@@ -42,16 +42,13 @@ curl -X POST http://localhost:3000/jobs \
       "message": "Hello from Jobber!"
     }
   }'
-
-# Monitor Job Status
-
-```bash
-# List jobs status
-curl http://localhost:3000/jobs
-
-# View jobs statistics
-curl http://localhost:3000/stats
 ```
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+
+- **[Architecture and Flow](./docs/architecture/architecture.md)** - Architecture and components
 
 ## Troubleshooting
 
