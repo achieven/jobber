@@ -134,7 +134,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Missing query builder or ORM, queries are sent as plain text with backticks and literals. 
     - As currently there are no params/body, sql-injection is not a current issue, but obviously for a real system this wouldn't do (nor it is pretty code)
 - Only treating stats of active/completed/failed, not stalled etc..
-- Lazy ladong DB connection instead of on startup
+- Lazy loading DB connection instead of on startup
 - Not closing DB connection upon exit, nor letting the running jobs finish
 - For perfect security - shared folder could be split so that only relevant functionalities exist in each of the projects
 
