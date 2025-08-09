@@ -42,7 +42,17 @@ curl -X POST http://localhost:3000/jobs \
       "message": "Hello from Jobber!"
     }
   }'
+
+  # Monitiring:
+
+  # Jobs list
+  curl http://localhost:3000/jobs
+
+  # Jobs success rate by characteristics
+  curl http://localhost:3000/stats
 ```
+
+
 
 ## 📚 Documentation
 
@@ -66,23 +76,9 @@ Jobber consists of:
     - Queue, using BullMQ
     - Cache - Storing text pair, for fast, local, check every time the job is failed
 
-## Architecture Agenda
-
-- The local machine hosts the web-server, worker (with it's c++ jobs obviously), and the redis instance.
-
-    - This is due to the real-time nature of wanting to execute jobs immediately as possible
-
-    - CORES_PER_CPP_PROCESS - An environment variable for the number of cores the C++ job should take is set at the worker's docker-compose section
-
-    - The worker divides the number of CPUs in the machine with CORES_PER_CPP_PROCESS, and the result is the worker concurrency. Each job is spawned by the worker using child_process. This setting is a top-limit which helps the OS to avoid unnecessary context swithces, yet uses the maximal concurrency for the worker given this constraint.
-
-    - The nodejs worker, webserver, and even redis, are mainly I/O bound, therefore, they do not utilizing CPU cores extensively, nor we need to consider that to decide the worker concurrency.
-
-- A remote machine hosts couchbase (locally for local development and quick-run)
-
-    - My original idea was to use couchbase as a low-latency, on-premise DB (which mongo can't offer in production, if using the vector search). However, during writing the code I thought again, that this DB shouldn't really be on-premise, within this task's score at least, it's set to retrieve analytics, which are most likely not for real-time usage (unless they are).
-
-    - Given my later reasoning, mongo would have been better, specifically for achieving immutable fields enforced by mongoose, while supporting atomicity and race-condition-proof (which ottoman.js can't do, an neither does the sdk have immutability feature - so only optimistic CAS, which is not the case for short-but-frequent job event updates).
+- Being a real-time environment, the local machine hosts the web-server, worker (with it's c++ jobs obviously), and the redis instance, for lightning-fast on-premise job execution.
+- A remote machine hosts couchbase (locally for local development and quick-run) for data management
+- More info about this is at the [architecture](./docs/architecture/architecture.md) section
 
 
 ## Local development
@@ -92,12 +88,6 @@ Jobber consists of:
 - **Web Server**: npm run buildWebServer
 - **Worker Service**:  npm run buildWorkerAndJobsLocally
 
-
-## 📝 TODOS
-  - ottoman.js
-  - split unshared from shared filter (e.g jobs-dao can be split into the functions needed for worker/web-server)
-  - covered index not covering
-  
 
 
 ## 📄 License

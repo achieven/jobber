@@ -6,6 +6,15 @@
 1. **Job Submission**: Jobs submitted via REST API
 2. **Queueing**: Jobs queued in Redis via BullMQ
 3. **Processing**: Worker service processes jobs with concurrency set to `(NUMBER_OF_CPU_CORES/EXPECTED_CORES_PER_CPP_JOB)`
+ 
+- Statistics about success rate by jobs characteristics and a list of all jobs is available at endpoints 
+
+## **Concurrency settings**:
+    - CORES_PER_CPP_PROCESS - An environment variable for the number of cores the C++ job should take is set at the worker's docker-compose section
+
+    - The worker divides the number of CPUs in the machine with CORES_PER_CPP_PROCESS, and the result is the worker concurrency. Each job is spawned by the worker using child_process. This setting is a top-limit which helps the OS to avoid unnecessary context swithces, yet uses the maximal concurrency for the worker given this constraint.
+
+    - The nodejs worker, webserver, and even redis, are mainly I/O bound, therefore, they do not utilize CPU cores extensively, nor we need to consider that to decide the worker concurrency.
 
 ### Event Handling & Data Persistence
 Upon receiving job events (active/success/failed), the system projects data into Couchbase, with 2 types of data:
@@ -70,6 +79,8 @@ Upon receiving job events (active/success/failed), the system projects data into
     - Performing a separate DB query for each error category instead of single query - not scaleable
     - Using a dummy 0.4 similarity threshold, for local testing only
     - Using general-purpose embedding model rather than programming-specific one
+- Missing query builder or ORM, queries are sent as plain text with backticks and literals. 
+    - As currently there are no params/body, sql-injection is not a current issue, but obviously for a real system this wouldn't do (nor it is pretty code)
 
 ## Optimal Architecture
 
