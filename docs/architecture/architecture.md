@@ -63,7 +63,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Success rate analysis by retry attempts
     - Motivation: Predicting, if a job has failed a given number of times, what are it's chances to eventually succeed
 - Concurrent job failure analysis (with known limitations)
-    - Motivation: Try to see patterns of 
+    - Motivation: Try to understand if resources aren't managed optimally, causing concurrent jobs to fail
 - Vector search by error categories
     - Motivation: Team has a list of error categories(e.g Timeout/Image processing error/Memory exceeded/Spawning child process failed etc..), it wants to know if how often do we encounter such error
 
