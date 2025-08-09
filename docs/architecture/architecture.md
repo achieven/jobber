@@ -90,7 +90,8 @@ Upon receiving job events (active/success/failed), the system projects data into
 2. **Vectorization Subscriber**: 
    - Performs a slow hash (e.g SHA-256) on the string
    - Checks Redis cache for error vectors
-   - On cache miss: calls OpenAI and publishes to vectorization pub-sub
+   - On cache miss: create embeddings and publishes to vectorization pub-sub
+   - As it being a subscriber designed for CPU bound operations, might also be able to execure ollama instead of paying openAI 
 3. **Data Persistence Subscribers**: 
    - Separate subscribers for Redis and Couchbase vector storage
    - Ensures eventual consistency without redundant operations
