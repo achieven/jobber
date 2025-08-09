@@ -10,11 +10,11 @@
 - Statistics about success rate by jobs characteristics and a list of all jobs is available at endpoints 
 
 ## **Concurrency settings**:
-    - CORES_PER_CPP_PROCESS - An environment variable for the number of cores the C++ job should take is set at the worker's docker-compose section
+- CORES_PER_CPP_PROCESS - An environment variable for the number of cores the C++ job should take is set at the worker's docker-compose section
 
-    - The worker divides the number of CPUs in the machine with CORES_PER_CPP_PROCESS, and the result is the worker concurrency. Each job is spawned by the worker using child_process. This setting is a top-limit which helps the OS to avoid unnecessary context swithces, yet uses the maximal concurrency for the worker given this constraint.
+- The worker divides the number of CPUs in the machine with CORES_PER_CPP_PROCESS, and the result is the worker concurrency. Each job is spawned by the worker using child_process. This setting is a top-limit which helps the OS to avoid unnecessary context swithces, yet uses the maximal concurrency for the worker given this constraint.
 
-    - The nodejs worker, webserver, and even redis, are mainly I/O bound, therefore, they do not utilize CPU cores extensively, nor we need to consider that to decide the worker concurrency.
+- The nodejs worker, webserver, and even redis, are mainly I/O bound, therefore, they do not utilize CPU cores extensively, nor we need to consider that to decide the worker concurrency.
 
 ### Event Handling & Data Persistence
 Upon receiving job events (active/success/failed), the system projects data into Couchbase, with 2 types of data:
