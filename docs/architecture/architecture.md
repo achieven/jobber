@@ -59,7 +59,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Provides latest job invocation data
 
 
-**Performance Analytics**:
+**Success rate statistics**:
 - Success rate analysis by retry attempts
     - Motivation: Predicting, if a job has failed a given number of times, what are it's chances to eventually succeed
 - Concurrent job failure analysis (with known limitations)
@@ -80,10 +80,7 @@ Upon receiving job events (active/success/failed), the system projects data into
     - Performing a separate DB query for each error category instead of single query - not scaleable
     - Using a dummy 0.4 similarity threshold, for local testing only
     - Using general-purpose embedding model rather than programming-specific one
-- Missing query builder or ORM, queries are sent as plain text with backticks and literals. 
-    - As currently there are no params/body, sql-injection is not a current issue, but obviously for a real system this wouldn't do (nor it is pretty code)
-- Only treating stats of active/completed/failed, not stalled etc..
-- Not closing DB connection
+
 
 ## Optimal Architecture
 
@@ -131,4 +128,12 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Stats are at the POC level - proving nice data for each category, but have some limitations regarding the quality of the data and some are not fully performance optimized
 - Redundant calls to OpenAI and Redis/Couchbase upserts
 - Memory overhead for storing keys as string
+
+**Other TODOS**:
+- Missing query builder or ORM, queries are sent as plain text with backticks and literals. 
+    - As currently there are no params/body, sql-injection is not a current issue, but obviously for a real system this wouldn't do (nor it is pretty code)
+- Only treating stats of active/completed/failed, not stalled etc..
+- Lazy ladong DB connection instead of on startup
+- Not closing DB connection upon exit, nor letting the running jobs finish
+- For perfect security - shared folder could be split so that only relevant functionalities exist in each of the projects
 
