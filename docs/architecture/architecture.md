@@ -31,7 +31,7 @@ Upon receiving job events (active/success/failed), the system projects data into
     - Couchbase supports on-premise vector search via Couchbase-Mobile
     - Couchbase designed for low latency
 - **Reality**: Current suggested architecture isn't really designed use on-premise deployment, making MongoDB a better retrospective choice
-- **Time constraint**: Personal familiarity with Couchbase vs. learning curve for MongoDB
+- **Time constraint**: Personal familiarity with Couchbase vs. recalling mongo from a few years ago when worked with it
 
 **2. Vector insertion**:
 1. Check Redis cache for existing error message vectors
