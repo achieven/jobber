@@ -107,6 +107,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Couchbase's optimistic CAS nature isn't suitable for frequent (even if short-ranged) updates
 - Mongo could use it's pessimistic nature to apply immutability while being race-condition-proof
 - More mature ORM support for complex operations
+
 **Hashing Strategy**:
 - Implement slow-hash for memory efficiency, on a separate services than the worker to avoid using it's limited CPUs
 - Store original text as a document field for queries
