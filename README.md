@@ -25,6 +25,10 @@ cp .env.example .env
 
 # Start the system
 docker compose up -d
+# For windows users
+change the compose.yml entry in couchbase to
+  dockerfile: Dockerfile.windows.couchbase
+before running the docker compose up command
 
 # Wait for Couchbase to initialize (60 seconds)
 sleep 60
@@ -49,6 +53,9 @@ curl http://localhost:3000/jobs
 curl http://localhost:3000/stats
 ```
 
+## Troubleshooting
+
+- Couchase not working
 ## 🏗️ Architecture
 
 Jobber consists of:
