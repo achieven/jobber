@@ -8,24 +8,23 @@
 3. **Processing**: Worker service processes jobs with concurrency set to `(NUMBER_OF_CPU_CORES/EXPECTED_CORES_PER_CPP_JOB)`
 
 ### Event Handling & Data Persistence
-Upon receiving job events (active/success/failed), the system projects data into Couchbase:
+Upon receiving job events (active/success/failed), the system projects data into Couchbase, with 2 types of data:
 
-**Event Storage**:
+**1. Event Storage**:
 - Events appended to arrays using Couchbase's atomic `MutateIn` sub-document operations
 - Uses only ArrayAppend, Increment, and Upsert operations, therefore race-condition-proof (no CAS required)
 - **Trade-off**: Some fields are redundantly upserted; not developer-bug proof for immutable fields (i.e job name/id/data) 
-- While ottoman.js could have supplied immutability, it lacks the atomic and race-condition-proof functionality that MutateIn offers. The same is also true the other way around - MutateIn using the SDK can't provide immutability.
+- While ottoman.js could have supplied immutability with the `immutable` identifier, it lacks the atomic and race-condition-proof functionality that MutateIn offers. The same is also true the other way around - MutateIn using the SDK can't provide immutability.
 
 **Database Choice Constraints**:
-- **Couchbase chosen over MongoDB** despite MongoDB being potentially better suited, as it can handle immutability and be race-condition-proof at the same time.
+- **Couchbase chosen over MongoDB** despite MongoDB being potentially better suited, as it can handle immutability (or rather, setOnInsert though it's less advised) and be race-condition-proof at the same time.
 - **Reasoning**: 
     - Couchbase supports on-premise vector search via Couchbase-Mobile
     - Couchbase designed for low latency
 - **Reality**: Current suggested architecture isn't really designed use on-premise deployment, making MongoDB a better retrospective choice
 - **Time constraint**: Personal familiarity with Couchbase vs. learning curve for MongoDB
 
-### Vectorization Architecture
-**Current Flow**:
+**2. Vector insertion**:
 1. Check Redis cache for existing error message vectors
 2. **Cache Hit**: No action needed
 3. **Cache Miss**: 
@@ -38,7 +37,9 @@ Upon receiving job events (active/success/failed), the system projects data into
   - Ollama rejected: Still consumes local CPU cores
   - Transformers rejected:  Very likely to block the main event loop thread
   - Child processes rejected: Limited CPU cores available, effetively similar consideration as ollama
-- **Memory vs. Performance Trade-off**: Plain text keys instead of fast-hashes to avoid fast-hash collisions, preventing false-positive cache-hits
+- **DB Memory overhead vs. Resource utilization trade-off**: 
+    - Plain text keys instead of slow-hashes which take expensive CPU cores
+    - Fast-hashes will cause fast-hash collisions, allowing false-positive cache-hits, causing data inconsistency
 - **Redundancy accepted**: Cache misses may cause redundant OpenAI calls and database upserts
 
 ### Statistics & Analytics
@@ -97,7 +98,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - More mature ORM support for complex operations
 **Hashing Strategy**:
 - Implement slow-hash for memory efficiency, on a separate services than the worker to avoid using it's limited CPUs
-- Store original text as document field for queries
+- Store original text as a document field for queries
 - Maintain hash-collision-proof consistency
 
 ## Bottom line - Implementation Constraints
@@ -112,8 +113,8 @@ Upon receiving job events (active/success/failed), the system projects data into
 **Limitations**:
 
 - Time constraints preventing full pub-sub implementation
-- Stats are at the POC level - proving nice data for each category, but have some limitations in the quality of the data and some not sully performance optimized
 - Excluding immutability for specific fields (job name/id/data)
+- Stats are at the POC level - proving nice data for each category, but have some limitations regarding the quality of the data and some are not fully performance optimized
 - Redundant calls to OpenAI and Redis/Couchbase upserts
 - Memory overhead for storing keys as string
 
