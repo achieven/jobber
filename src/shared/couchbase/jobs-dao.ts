@@ -22,13 +22,7 @@ export class JobsDAO extends BaseDAO {
     async upsertJobEvent(jobId: string, jobName: string, jobData: any[], status: JOB_STATUS, data: any): Promise<MutateInResult> {
         
         const updatedAt = Date.now();
-        //TODO - 
-        // while it's race-condition-proof due to mutateIn being atmic and internally-locked, 
-        // it could accidentally replace existing jobId & jobName, 
-        // only optimistic deciding that the active will be the first event (which could be the decision to make)
-        //  or niql update with ignoring change if field is set can help (but will not throw error in caes of developer error)
-        // ottomanjs immutable isn't suitable because it's still using CAS (unless we optimistically insert/update accordingly)
-        // (or moving to mongo)
+
         
         let mutateInSpecs = [
             MutateInSpec.upsert('jobId', jobId, { createPath: true }), 
@@ -58,13 +52,13 @@ export class JobsDAO extends BaseDAO {
                 upsertDocument: true
             });
         } catch (error) {
-            console.error('Error in upsertJobEvent:', error);//TODO add to errors bucket/collection (preferably collection)
-            // throw error;
+            console.error('Error in upsertJobEvent:', error);
+
         }
     }
 
     async getJobs() {
-        // TODO return as object in MAX instead of array
+
         const fields = `jobName,
             MAX([updatedAt, TO_NUMBER(jobId), status, events]) as latestInvocation, 
             SUM(CASE WHEN status = '${JOB_STATUS.ACTIVE}' THEN 1 ELSE 0 END) AS activeCount,
@@ -87,7 +81,7 @@ export class JobsDAO extends BaseDAO {
 
     async getErrorCategorySuccessRate(errorCategories: any[]) {
 
-        //what is the success rate of jobs that failed with errors
+
         let errorCategoriesPromises = [];
         for (let errorCategory of errorCategories) {
             const errorCategoriesQuery = `
@@ -188,8 +182,7 @@ export class JobsDAO extends BaseDAO {
     }
 
     async getPerConcurrentJobsStats() {
-        //possibly with postgres it might have been able to leverage the timeseries feature to do the window matching.
-        //either way, couchbase's time-series function doesn't help us here, except possibly for indexing, but not at the level of querying essentially different
+
         const perConcurrentJobsQuery = `
             WITH JobTimeWindows AS (
                 -- Step 1: Calculate the active time window for each job.

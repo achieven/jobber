@@ -75,12 +75,15 @@ Upon receiving job events (active/success/failed), the system projects data into
     - "Concurrent" is only at the top level (doesn't account for delays).
     - Detection is binary - doesn't provide success rate by number of concurrent invocations, only whether there is *any* job running concurrently
     - Doesn't compare to non-concurrent jobs success rate, making it not useful enough to the user
+    - A timeseries supporting DB (not the couchbase timeseries functionality) such as postgres might have helped us here to achive this easier
 - Vector seach:
     - Performing a separate DB query for each error category instead of single query - not scaleable
     - Using a dummy 0.4 similarity threshold, for local testing only
     - Using general-purpose embedding model rather than programming-specific one
 - Missing query builder or ORM, queries are sent as plain text with backticks and literals. 
     - As currently there are no params/body, sql-injection is not a current issue, but obviously for a real system this wouldn't do (nor it is pretty code)
+- Only treating stats of active/completed/failed, not stalled etc..
+- Not closing DB connection
 
 ## Optimal Architecture
 

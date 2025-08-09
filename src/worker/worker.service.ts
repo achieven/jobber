@@ -43,9 +43,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     private setupEventHandlers() {
-        this.worker.on('progress', async (job: Job, progress: number | object) => {
-            // Handle progress updates
-        });
+        this.worker.on('progress', async (job: Job, progress: number | object) => {});
 
         this.worker.on('active', async (job: Job) => {
             await this.jobsService.setActiveJob(job.id, job.name, job.data, JOB_STATUS.ACTIVE, {});
@@ -58,7 +56,6 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         });
 
         this.worker.on('error', (err) => {
-            // Worker error handling
         });
 
         this.worker.on('failed', async (job: Job, err: Error) => {

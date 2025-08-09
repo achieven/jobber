@@ -36,7 +36,7 @@ export abstract class BaseDAO {
         }
     }
 
-    // Getter properties - accessible as fields but with lazy loading
+
     get collection(): Promise<Collection> {
         return this.getCollectionInternal();
     }

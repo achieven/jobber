@@ -26,6 +26,7 @@ export class ErrorVectorMessageDAO extends BaseDAO {
     }
 
     async createSearchIndex() {
+        console.log('creating search index')
         const searchIndexManager = new SearchIndexManager((await this.bucket).cluster);
 
         try {

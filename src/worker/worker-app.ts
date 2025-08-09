@@ -6,7 +6,7 @@ async function bootstrap() {
     
     console.log('Worker application started');
     
-    // Keep the application running
+
     process.on('SIGINT', async () => {
         console.log('Shutting down worker...');
         await app.close();

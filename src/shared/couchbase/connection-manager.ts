@@ -97,7 +97,6 @@ class CouchbaseConnectionManager {
     async getCollection(bucketName: string, scopeName: string = '_default', collectionName: string = '_default'): Promise<Collection> {
         const cacheKey = `${bucketName}:${scopeName}:${collectionName}`;
         
-        // Check if collection already exists in cache
         if (this.collections.has(cacheKey)) {
             return this.collections.get(cacheKey)!;
         }
