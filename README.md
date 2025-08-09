@@ -85,18 +85,6 @@ Jobber consists of:
     - Given my later reasoning, mongo would have been better, specifically for achieving immutable fields enforced by mongoose, while supporting atomicity and race-condition-proof (which ottoman.js can't do, an neither does the sdk have immutability feature - so only optimistic CAS, which is not the case for short-but-frequent job event updates).
 
 
-
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the [`docs/`](./docs/) directory:
-
-- **[Quick Start Guide](./docs/getting-started/quick-start.md)** - Get up and running in minutes
-- **[System Overview](./docs/architecture/system-overview.md)** - Architecture and components
-- **[API Reference](./docs/development/api-reference.md)** - Complete REST API documentation
-- **[Job Development](./docs/development/job-development.md)** - Create custom C++ jobs
-- **[Deployment Guide](./docs/operations/deployment.md)** - Production deployment
-
 ## Local development
 
 
@@ -108,6 +96,8 @@ Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 ## 📝 TODOS
   - ottoman.js
   - split unshared from shared filter (e.g jobs-dao can be split into the functions needed for worker/web-server)
+  - covered index not covering
+  
 
 
 ## 📄 License

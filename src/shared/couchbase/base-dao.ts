@@ -105,7 +105,7 @@ export abstract class BaseDAO {
 
     protected async selectRaw(query: string): Promise<any> {
         const bucket = await this.bucket;
-        // console.log(query);
+        console.log(query);
         return (await bucket.cluster.query(query)).rows;
     }
 

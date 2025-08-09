@@ -33,7 +33,7 @@ export class JobsController {
     @Get('/')
     async getJobs(@Res() res: Response) {
         try {
-            const jobs = await this.jobsDAO.getJobs();
+            const jobs = (await this.jobsDAO.getJobs())[0];
             return res.status(HttpStatus.ACCEPTED).json({
                 jobs
             });
