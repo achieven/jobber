@@ -38,17 +38,16 @@ curl -X POST http://localhost:3000/jobs \
       "message": "Hello from Jobber!"
     }
   }'
+
+# Monitor Job Status
+
+```bash
+# List jobs status
+curl http://localhost:3000/jobs
+
+# View jobs statistics
+curl http://localhost:3000/stats
 ```
-
-## 📚 Documentation
-
-Comprehensive documentation is available in the [`docs/`](./docs/) directory:
-
-- **[Quick Start Guide](./docs/getting-started/quick-start.md)** - Get up and running in minutes
-- **[System Overview](./docs/architecture/system-overview.md)** - Architecture and components
-- **[API Reference](./docs/development/api-reference.md)** - Complete REST API documentation
-- **[Job Development](./docs/development/job-development.md)** - Create custom C++ jobs
-- **[Deployment Guide](./docs/operations/deployment.md)** - Production deployment
 
 ## 🏗️ Architecture
 
@@ -83,6 +82,17 @@ Jobber consists of:
 
 
 
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+
+- **[Quick Start Guide](./docs/getting-started/quick-start.md)** - Get up and running in minutes
+- **[System Overview](./docs/architecture/system-overview.md)** - Architecture and components
+- **[API Reference](./docs/development/api-reference.md)** - Complete REST API documentation
+- **[Job Development](./docs/development/job-development.md)** - Create custom C++ jobs
+- **[Deployment Guide](./docs/operations/deployment.md)** - Production deployment
+
 ## Local development
 
 
@@ -92,7 +102,8 @@ Jobber consists of:
 
 
 ## 📝 TODOS
-
+  - ottoman.js
+  - split unshared from shared filter (e.g jobs-dao can be split into the functions needed for worker/web-server)
 
 
 ## 📄 License

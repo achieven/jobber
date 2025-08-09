@@ -10,7 +10,6 @@ export class ErrorVectorMessageDAO extends BaseDAO {
     }
 
     async upsertErrorVector(errorMessage: string, errorVector: number[]) {
-        console.log(errorMessage, errorVector)
         return await this.upsert(errorMessage, {
             value: errorVector,
             text: errorMessage

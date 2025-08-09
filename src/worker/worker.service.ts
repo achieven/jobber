@@ -22,18 +22,16 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         this.worker = new Worker(
             QueueConfigService.QUEUE_NAME,
             async (job: Job) => {
-                console.log(`[${new Date().toISOString()}] Processing job ${job.id} (attempt ${job.attemptsMade + 1}/${job.opts.attempts}) with data: ${JSON.stringify(job.data)}`);
-
                 try {
                     const result = await executeCppJob(job.name, job.data, job.attemptsMade + 1);
-                    console.log(`[${new Date().toISOString()}] Job ${job.id} completed successfully. Result: ${result}`);
+                    console.log('Job', job.id, 'completed successfully');
                     return { success: true, result: result };
                 } catch (error) {
-                    console.error(`[${new Date().toISOString()}] Job ${job.id} failed on attempt ${job.attemptsMade + 1}. Error: ${error.message}`);
+                    console.error('Job', job.id, 'failed on attempt', job.attemptsMade);
                     if (job.attemptsMade + 1 >= job.opts.attempts) {
-                        console.error(`[${new Date().toISOString()}] Job ${job.id} has exhausted all ${job.opts.attempts} attempts. Marking as permanently failed.`);
+                        console.error('Job', job.id, 'has exhausted all', job.opts.attempts, 'attempts. Marking as permanently failed.');
                     } else {
-                        console.log(`[${new Date().toISOString()}] Job ${job.id} will be retried. Attempts remaining: ${job.opts.attempts - (job.attemptsMade + 1)}`);
+                        console.log('Job', job.id, 'will be retried. Attempts remaining:', job.opts.attempts - (job.attemptsMade + 1));
                     }
                     throw error;
                 }
@@ -60,7 +58,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         });
 
         this.worker.on('error', (err) => {
-            console.error('Worker error:', err);
+            // Worker error handling
         });
 
         this.worker.on('failed', async (job: Job, err: Error) => {

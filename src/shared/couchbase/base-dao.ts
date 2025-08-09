@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Collection, Bucket, Scope } from 'couchbase';
+import { Collection, Bucket, Scope, IndexExistsError } from 'couchbase';
 import { couchbaseManager } from './connection-manager';
 
 @Injectable()
@@ -24,7 +24,6 @@ export abstract class BaseDAO {
     }
 
     protected async ensureInitialized(): Promise<void> {
-        console.log(this.isInitialized, this.collectionName)
         if (!this.isInitialized) {
             try {
                 await couchbaseManager.initialize();
@@ -106,26 +105,46 @@ export abstract class BaseDAO {
 
     protected async selectRaw(query: string): Promise<any> {
         const bucket = await this.bucket;
-        console.log(query);
+        // console.log(query);
         return (await bucket.cluster.query(query)).rows;
     }
 
     protected async upsert(key: string, value: any) {
         const collection = await this.collection;
+        console.log(this.collectionName,'upserting', key);
         return collection.upsert(key, value);
     }
 
     protected async insert(key: string, value: any) {
         const collection = await this.collection;
+        console.log(this.collectionName,'inserting', key);
         return collection.insert(key, value);
     }
 
     protected async mutateIn(key: string, specs: any[], options?: any): Promise<any> {
         const collection = await this.collection;
+        console.log(this.collectionName,'mutateIn', key);
         return collection.mutateIn(key, specs, options);
     }
 
     protected async ensureIndexes(collectionName: string): Promise<void> {}
+
+    
+    /*
+    Sdk doesn't seem to handle array indexes and treats it like a field index, with backticks surrounding the index name.
+    Slso, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it.
+    */ 
+    protected async createArrayIndex(indexName:string, keys: string) {
+        try {
+            const buildIndexQuery = `CREATE INDEX ${indexName} ON ${this.bucketScopeCollection} ${keys} WITH {"defer_build": true}`
+            await (await this.bucket).cluster.query(buildIndexQuery);
+        } catch (error) {
+            if (!(error instanceof IndexExistsError)) {
+                throw error;
+            }
+            await this.waitTillIndexCreation();
+        }
+    }
 
     async waitTillIndexCreation() {
         return new Promise((resolve, reject) => {
@@ -135,8 +154,5 @@ export abstract class BaseDAO {
         })
     }
 } 
-
-//sdk doesn't seem to handle array indexes and treats it like a field index, with backticks surrounding
-//also, creation using cluster.query seems to be throwing an error the index already exists, even if it isn't, so we're catching it
 
 
