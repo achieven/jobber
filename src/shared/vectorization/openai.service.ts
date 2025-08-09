@@ -14,7 +14,7 @@ export class OpenAIService {
     }
 
     async getEmbedding(text: string) {
-        console.log('openai get embedding')
+        console.log('openai get embedding', text)
         try {
             const response = await this.openai.embeddings.create({
                 model: "text-embedding-3-small",

@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 
 export async function executeCppJob(jobName: string, jobData: string[], attemptNumber?: number): Promise<string> {
     return new Promise((resolve, reject) => {
-        console.log(`[${new Date().toISOString()}] Spawning C++ process for job: ${jobName} with args: ${JSON.stringify(jobData)} (attempt ${attemptNumber || 'unknown'})`);
+        console.log('Spawning C++ process for job:', jobName, 'attempt', attemptNumber);
         
         const cppProcess = spawn(`${process.cwd()}/dist/worker/jobs/${jobName}`, jobData, {
             cwd: process.cwd(), 
@@ -12,12 +12,10 @@ export async function executeCppJob(jobName: string, jobData: string[], attemptN
 
         cppProcess.stdout.on('data', (data) => {
             stdout += data.toString();
-            console.log(`C++ stdout for job ${jobName}: ${data.toString().trim()}`);
         });
 
         cppProcess.stderr.on('data', (data) => {
             stderr += data.toString();
-            console.error(`C++ stderr for job ${jobName}: ${data.toString().trim()}`);
         });
 
         cppProcess.on('close', (code) => {
@@ -27,7 +25,6 @@ export async function executeCppJob(jobName: string, jobData: string[], attemptN
             } else {
                 const errorMessage = `C++ process for job ${jobName} exited with code ${code}. Stderr: ${stderr.trim()}`;
                 console.error(errorMessage);
-                // Create a custom error that BullMQ will treat as retryable
                 const error = new Error(errorMessage);
                 error.name = 'CppProcessError';
                 reject(error);
