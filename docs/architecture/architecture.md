@@ -1,80 +1,119 @@
-1. **Job Flow**:
-   - Job submitted via REST API
+# Architecture Overview
 
-   - Queued in Redis via BullMQ
+## Current Architecture
 
-   - Processed by Worker service
-        - concurrency set to (NUMBER_OF_CPU_CORES/EXPECTED_CORES_PER_CPP_JOB)
+### Job Processing Flow
+1. **Job Submission**: Jobs submitted via REST API
+2. **Queueing**: Jobs queued in Redis via BullMQ
+3. **Processing**: Worker service processes jobs with concurrency set to `(NUMBER_OF_CPU_CORES/EXPECTED_CORES_PER_CPP_JOB)`
 
-   - Upon receiving events from the job (active/success/failed) -> projecting that into couchbase with the success response or error (also as a vector)
-        - First appending that event to the events array.
+### Event Handling & Data Persistence
+Upon receiving job events (active/success/failed), the system projects data into Couchbase:
 
-            - Couchbase does it using the atomic and race-condition-proof (for the types of mutations this specific app is currently performing) "MutateIn" sub-document operation. Since there is only ArrayAppend, Increment, and Upsert, we don't need to supply a CAS and worry about optimistic locking.
+**Event Storage**:
+- Events appended to arrays using Couchbase's atomic `MutateIn` sub-document operations
+- Uses only ArrayAppend, Increment, and Upsert operations, therefore race-condition-proof (no CAS required)
+- **Trade-off**: Some fields are redundantly upserted; not developer-bug proof for immutable fields (i.e job name/id/data) 
+- While ottoman.js could have supplied immutability, it lacks the atomic and race-condition-proof functionality that MutateIn offers. The same is also true the other way around - MutateIn using the SDK can't provide immutability.
 
-                - However, there is some cost - we redundantly upsert some of the fields. It's not developer-bug proof, in case the developer accidentally change a field that should be immutable - this will be a bug.
+**Database Choice Constraints**:
+- **Couchbase chosen over MongoDB** despite MongoDB being potentially better suited, as it can handle immutability and be race-condition-proof at the same time.
+- **Reasoning**: 
+    - Couchbase supports on-premise vector search via Couchbase-Mobile
+    - Couchbase designed for low latency
+- **Reality**: Current suggested architecture isn't really designed use on-premise deployment, making MongoDB a better retrospective choice
+- **Time constraint**: Personal familiarity with Couchbase vs. learning curve for MongoDB
 
-                    - While we could implement the whole task using ottoman.js ORM, using the "immutable" identifier, ottoman itself can't help us with atomic updates, as it essentially does an optimistic CAS, which in our case, due to the short-but-frequent nature of job events, might throw an error, causing the event to get lost (with current architecture which doesn't do retries/queue/pub-sub).
+### Vectorization Architecture
+**Current Flow**:
+1. Check Redis cache for existing error message vectors
+2. **Cache Hit**: No action needed
+3. **Cache Miss**: 
+   - Call OpenAI API for embeddings (avoiding local CPU usage)
+   - Upsert to Couchbase first (single source of truth)
+   - Then upsert to Redis cache
 
-                        - Mongo with mongoose would have probably been a better fit for that, using either "setOnInsert", or the "immutable" identifier.
+**Vectorization Constraints**:
+- **OpenAI chosen over local alternatives**:
+  - Ollama rejected: Still consumes local CPU cores
+  - Transformers rejected:  Very likely to block the main event loop thread
+  - Child processes rejected: Limited CPU cores available, effetively similar consideration as ollama
+- **Memory vs. Performance Trade-off**: Plain text keys instead of fast-hashes to avoid fast-hash collisions, preventing false-positive cache-hits
+- **Redundancy accepted**: Cache misses may cause redundant OpenAI calls and database upserts
 
-                            - However, mongo can't run on-premise vector search, like couchbase can using Couchbase-Mobile. Yet, the architecture actually isn't designed for couchbase to be on-premise, so mongo would have probably been the better option in retrospect, as low-latency is not the main focus here. But it's been a while since i worked with Mongo, so that would have taken me longer.
-                                - Had it been not a POC - I would choose mongo.
+### Statistics & Analytics
+**Job Statistics**:
+- Groups jobs by name with counters for active/failed/completed states
+- Provides all job Ids, for general understanding (can be clickable to get data for each job)
+- Tracks aurrently active jobs for live monitoring
+- Provides latest job invocation data
 
-        - Then check if redis has already the vector for this error message
-            - Cache hit: 
-                - no need to do anything
-                
-            - Cache miss:
 
-                - Call openAI to get the embeddings without spending worker machine's CPU on vectorization. Worse alternatives are:
-                    - Ollama doesn't help, becuase, while it is essetially spawning a new process and communicates using I/O, as it's designed to be a real-time app, is still taking CPU cores from the local machine.
+**Performance Analytics**:
+- Success rate analysis by retry attempts
+    - Motivation: Predicting, if a job has failed a given number of times, what are it's chances to eventually succeed
+- Concurrent job failure analysis (with known limitations)
+    - Motivation: Try to see patterns of 
+- Vector search by error categories
+    - Motivation: Team has a list of error categories(e.g Timeout/Image processing error/Memory exceeded/Spawning child process failed etc..), it wants to know if how often do we encounter such error
 
-                    - Transformers are even worse idea, as they could block single thread, blocking the worker from handling jobs altogether.
+**Known Limitations (given time constraint and task being essentialy a POC)**:
+- Retries analytics:
+    - Current index not covering the fetched fields, therefore performing another fetch (within couchbase) to retrieve the data.
+        - This is very practical to overcome, just didn't get to it (at the time of writing this documentation)
+- Concurrency detection:
+    - "Concurrent" is only at the top level (doesn't account for delays).
+    - Detection is binary - doesn't provide success rate by number of concurrent invocations, only whether there is *any* job running concurrently
+    - Doesn't compare to non-concurrent jobs success rate, making it not useful enough to the user
+- Vector seach:
+    - Performing a separate DB query for each error category instead of single query - not scaleable
+    - Using a dummy 0.4 similarity threshold, for local testing only
+    - Using general-purpose embedding model rather than programming-specific one
 
-                    - Spawning a new child process or worker thread, is conceptually somewhat similar in a way to ollama (especially child process), therefore a no-go as well due to the limited CPU cores we have
+## Optimal Architecture
 
-                - After receiving response from openAI:
-                    - First upsert it to couchbase, as couchbase is the single source of truth.
-                        - This is crucial that Redis await the couchbase insertion, as otherwise Redis would have identified a cache-hit which is not in couchbase, therefore preventing eventual consistency for couchbase queried DB.
+### Pub-Sub Event-Driven Design
+**Decoupled Event Processing**:
+1. **Event Subscriber**: Handles job event persistence to Couchbase (completely decoupled from vectorization)
+2. **Vectorization Subscriber**: 
+   - Performs a slow hash (e.g SHA-256) on the string
+   - Checks Redis cache for error vectors
+   - On cache miss: calls OpenAI and publishes to vectorization pub-sub
+3. **Data Persistence Subscribers**: 
+   - Separate subscribers for Redis and Couchbase vector storage
+   - Ensures eventual consistency without redundant operations
+   - Ensures low memory overhead for storing hashes instead of strings as keys, without hash collisions
 
-                    - Redis upserts this as key-value
-                        - Currently Redis (and couchbase) stores the key as the plain text rather than a fast-hash, which causes some memory overhead, but is at least fast-hash-collision proof, which makes it eventually consistent
+**Benefits**:
+- Complete eventual consistency, without redundant OpenAI API calls, nor redundant upserts
 
-                            -  The ideal 2-subscribers-pub-sub architecture described in the end, would have solve that. 
 
-                            - However, there's still the fact that we currently use the query using the meta().id as the key to the JOIN, so if we would have wanted a fast-hash, we just would have needed to save the text as a field in the error message document.
+**Trade-offs**:
+- Increased complexity (more services to manage) - especially within the time constraints
+### Database Optimization
+**MongoDB Alternative**:
+- Couchbase's optimistic CAS nature isn't suitable for frequent (even if short-ranged) updates
+- Mongo could use it's pessimistic nature to apply immutability while being race-condition-proof
+- More mature ORM support for complex operations
+**Hashing Strategy**:
+- Implement slow-hash for memory efficiency, on a separate services than the worker to avoid using it's limited CPUs
+- Store original text as document field for queries
+- Maintain hash-collision-proof consistency
 
-                            - A real slow-hash which is hash-collision-proof but CPU intensive isn't a good fit, as it's consuming resources from the worker, of the same reasons the openAI embedding section described above explains.
+## Bottom line - Implementation Constraints
 
-                    - This design takes into account that upon cache misses there will be redundant calls to openAI and redundant upserts to both Redis & Couchbase, but it's a trade-off wer'e willing to take, as we optimistically assume that the error messages are limited and only once in a while there will be a cache-miss. 
+**Current POC**:
 
-        - Ideally, this whole thing better be done with a Pub-Sub architecture:
-            - First subsriber appends the event to couchbase, compltely decoupled from the whole vectorization section.
+**Data integrity**:
+- Balances complexity vs. functionality for proof-of-concept scope
+- Provides sufficient consistency for demonstration purposes
+- Architecture suitable for integration into larger systems, within the limitations described below
 
-            - Second subscriber can do the check in redis for a cache-hit/cache-miss, and in case of cache miss, call openAI, receive the response, and produce it to another pub-sub.
+**Limitations**:
 
-            - The second pub-sub will have one which inserts it to redis, and the other to couchbase. This way we have complete eventual consistency without redundant openAI calls or Redis/Couchbase upserts (at the price of managing more services). This is the best solution because we vectorize for statistics, not for real-time critical application.
-                - I didn't implement in such way, mainly due to time constraints, but also because it's possibly a part of a wider application, and some other calculations might come into play, and this solution is good enough for a POC, as it does achieve eventual consistency, but at the cost of very likely redundant calls to openAI, and upserts to Redis & Couchbase, upon cache-miss.
-    
-    - Statistics:
-        - Get jobs - groups the jobs by their job name and returns the following fields for each group:
-            - A counter for each type of the jobs (active/failed/completed)
-            - A list of all the job ids of this job name
-            - A list of all the jobs of this job name that are currently running (for team to be able to track it live)
-            - The latest job invocation (by the last update time) - same structure as the list of currency running jobs
+- Time constraints preventing full pub-sub implementation
+- Stats are at the POC level - proving nice data for each category, but have some limitations in the quality of the data and some not sully performance optimized
+- Excluding immutability for specific fields (job name/id/data)
+- Redundant calls to OpenAI and Redis/Couchbase upserts
+- Memory overhead for storing keys as string
 
-        - Get stats:
-            - Grouping by the number of up-to-attemps. 
-            - The idea is that the team can "predict", that if a job has failed a given number of of times, it eventually will succeed(given the number of retries condigured), a percentage of the times (i.e the "success rate").
-
-            - Success rate of concurrent jobs.
-            - The idea is to try and undestand how often do concurrent jobs fail, which could indicate that the resources are used wrongly.
-                - This is a POC, so it's not 100%, but i'm aware of that. The current implementation treats "concurrent" as jobs that have been digested by the worker, not taking into account delays, so theoretically considering some non-really-concurrent jobs as concurrent.
-                - Also, ideally we would also want some understanding of whether the *number* of concurrent jobs affects the success rate, and not just a binary approach.
-                - Also, it doesn't compare
-
-            - Vector search on the errors, by error categories (inserted dummy upon startup)
-            - The idea is that the team has some list of error categories (e.g "C++ error", "Image processing error", "Memory exceeded", "Timeout", etc..), and the stats return for each error category, the success rate of jobs that failed with similar errors.
-                - There is a known issue i'm aware of, which the "k" is applied on the total number of items, instead of conly on the error messages, so it includes the error categories, as it's within the same collection, therefore the first one is abviously the error category itself (and also the other errors categories are usually more similar to the queried error category).
-                - The threshold for passing as a "matching" error is 0.4, which I found is giving some filters to the dummy error categories i supplied, and to the dummy errors i used in the C++ app.
-                - I'm using the openAI model of "text-embedding-3-small" for this POC. For sure there are better models that are more adequate for programmatic terms, or even a sub-nieche of programming errors (maybe).
