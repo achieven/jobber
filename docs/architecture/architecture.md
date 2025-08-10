@@ -49,6 +49,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - **DB Memory overhead vs. Resource utilization trade-off**: 
     - Plain text keys instead of slow-hashes which take expensive CPU cores
     - Fast-hashes will cause fast-hash collisions, allowing false-positive cache-hits, causing data inconsistency
+    - Batching slow-hash (either in-service or exported to external) is somewhat possible, because while it does increase the window for redundant calls, the nature of the events is frequent, yet short
 - **Redundancy accepted**: Cache misses may cause redundant OpenAI calls and database upserts
 
 ### Statistics & Analytics
@@ -91,7 +92,8 @@ Upon receiving job events (active/success/failed), the system projects data into
    - Performs a slow hash (e.g SHA-256) on the string
    - Checks Redis cache for error vectors
    - On cache miss: create embeddings and publishes to vectorization pub-sub
-   - As it being a subscriber designed for CPU bound operations, might also be able to execure ollama instead of paying openAI 
+   - As it being a subscriber designed for CPU bound operations, might also be able to execure ollama instead of paying openAI
+   - Batching can help here as it acheives consistency while spending less CPU
 3. **Data Persistence Subscribers**: 
    - Separate subscribers for Redis and Couchbase vector storage
    - Ensures eventual consistency without redundant operations
