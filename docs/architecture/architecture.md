@@ -138,4 +138,5 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Lazy loading DB connection instead of on startup
 - Not closing DB connection upon exit, nor letting the running jobs finish
 - For perfect security - shared folder could be split so that only relevant functionalities exist in each of the projects
+- No TDD
 
