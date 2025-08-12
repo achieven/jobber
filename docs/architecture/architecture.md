@@ -100,7 +100,7 @@ Upon receiving job events (active/success/failed), the system projects data into
 - Eliminating redundant OpenAI API calls, nor redundant upserts
 - Ensures low memory overhead for storing hashes instead of strings as keys, without hash collisions
 - No need to take resources from Redis to store non job-related data
-- While Couchbase Eventing service could have managed the OpenAI calls, and possibly could have even done that in a secure way for  storing the API key, but the slow-hashing step is CPU bound and could cause high CPU internally in couchbase
+- While Couchbase Eventing service could have managed the OpenAI calls, and possibly could have even done that in a secure way for  storing the API key (by a dedicated encrypted secrets bucket and permission it correctly), but the slow-hashing step is CPU bound and could cause high CPU internally in couchbase
 **Trade-offs**:
 - Increased complexity (more services to manage) - especially within the time constraints
 ### Database Optimization
