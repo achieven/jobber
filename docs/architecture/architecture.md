@@ -90,31 +90,25 @@ Upon receiving job events (active/success/failed), the system projects data into
 1. **Event Subscriber**: Handles job event persistence to Couchbase (completely decoupled from vectorization)
 2. **Vectorization Subscriber**: 
    - Performs a slow hash (e.g SHA-256) on the string
-   - Checks Redis cache for error vectors
-   - On cache miss: create embeddings and publishes to vectorization pub-sub
+   - Checks Couchbase if contains the error vector
+   - On miss: create embeddings (by network call or internally) and publishes to vectorization pub-sub
    - As it being a subscriber designed for CPU bound operations, might also be able to execure ollama instead of paying openAI
-   - Batching can help here as it acheives consistency while spending less CPU
-3. **Data Persistence Subscribers**: 
-   - Separate subscribers for Redis and Couchbase vector storage
-   - Ensures eventual consistency without redundant operations
-   - Ensures low memory overhead for storing hashes instead of strings as keys, without hash collisions
+   - Batching can help here as it acheives consistency while spending less I/O on the service/CPU if choosing ollama, and DB resources rise due to often Get opeartions.
 
 **Benefits**:
-- Complete eventual consistency, without redundant OpenAI API calls, nor redundant upserts
-
-
+- Easy to achieve eventual consistency, without thinking about race conditions
+- Eliminating redundant OpenAI API calls, nor redundant upserts
+- Ensures low memory overhead for storing hashes instead of strings as keys, without hash collisions
+- No need to take resources from Redis to store non job-related data
+- While Couchbase Eventing service could have managed the OpenAI calls, and possibly could have even done that in a secure way for  storing the API key, but the slow-hashing step is CPU bound and could cause high CPU internally in couchbase
 **Trade-offs**:
 - Increased complexity (more services to manage) - especially within the time constraints
 ### Database Optimization
+
 **MongoDB Alternative**:
 - Couchbase's optimistic CAS nature isn't suitable for frequent (even if short-ranged) updates
 - Mongo could use it's pessimistic nature to apply immutability while being race-condition-proof
 - More mature ORM support for complex operations
-
-**Hashing Strategy**:
-- Implement slow-hash for memory efficiency, on a separate services than the worker to avoid using it's limited CPUs
-- Store original text as a document field for queries
-- Maintain hash-collision-proof consistency
 
 ## Bottom line - Implementation Constraints
 

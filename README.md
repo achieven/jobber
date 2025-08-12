@@ -50,6 +50,9 @@ curl -X POST http://localhost:3000/jobs \
 
   # Jobs success rate by characteristics
   curl http://localhost:3000/stats
+  - concurrent jobs success rate
+  - success rate by number of precieing failures
+  - success rate by vector search upon known error categories
 ```
 
 
